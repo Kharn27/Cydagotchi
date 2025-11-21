@@ -48,7 +48,7 @@ void actionStartGameFromNewPet();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
-  { 60, 110, 200, 40, "Créer un nouveau Cydagotchi", TFT_DARKGREEN, TFT_WHITE, TFT_WHITE, actionStartNewPet },
+  { 60, 110, 200, 40, "Nouveau Cydagotchi", TFT_DARKGREEN, TFT_WHITE, TFT_WHITE, actionStartNewPet },
   { 60, 160, 200, 40, "Load Pet", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionLoadPet }
 };
 
