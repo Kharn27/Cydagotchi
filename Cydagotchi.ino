@@ -1,4 +1,6 @@
-#include <SPI.h>                       // << AJOUT
+// Bibliothèques principales
+#include <SPI.h>
+#include <cstring>
 #include <TFT_eSPI.h>
 //#include <XPT2046_Touchscreen.h>       // << je te conseille la lib officielle
  #include <XPT2046_Touchscreen_TT.h>  // tu peux commenter celle-là
@@ -29,6 +31,21 @@ enum AppState {
 
 AppState appState = STATE_TITLE;
 
+// --- Modèle de pet ---
+struct Pet {
+  char name[16];
+  float age;
+  float hunger;
+  float energy;
+  float social;
+  float cleanliness;
+  float curiosity;
+  float mood;
+};
+
+Pet currentPet;
+bool petInitialized = false;
+
 // --- Définition de boutons enrichis ---
 typedef void (*ButtonAction)();
 
@@ -45,6 +62,17 @@ struct Button {
 void actionStartNewPet();
 void actionLoadPet();
 void actionStartGameFromNewPet();
+void actionEat();
+void actionSleep();
+void actionPlay();
+void actionWash();
+
+// Actions applicatives
+void applyPlayerActionEat();
+void applyPlayerActionSleep();
+void applyPlayerActionPlay();
+void applyPlayerActionWash();
+void updateMood();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
@@ -56,8 +84,45 @@ Button newPetButtons[] = {
   { 70, 170, 180, 40, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
 };
 
+Button gameButtons[] = {
+  { 20, 180, 70, 40, "Mange", TFT_DARKGREEN, TFT_WHITE, TFT_WHITE, actionEat },
+  { 95, 180, 70, 40, "Dors", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionSleep },
+  { 170, 180, 70, 40, "Joue", TFT_BLUE, TFT_WHITE, TFT_WHITE, actionPlay },
+  { 245, 180, 70, 40, "Lave", TFT_CYAN, TFT_BLACK, TFT_WHITE, actionWash }
+};
+
 const size_t MENU_BUTTON_COUNT   = sizeof(menuButtons) / sizeof(menuButtons[0]);
 const size_t NEWPET_BUTTON_COUNT = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
+const size_t GAME_BUTTON_COUNT   = sizeof(gameButtons) / sizeof(gameButtons[0]);
+
+// --- Helpers Pet ---
+float clamp01(float v) {
+  if (v < 0.0f) return 0.0f;
+  if (v > 1.0f) return 1.0f;
+  return v;
+}
+
+void updateMood() {
+  float sum = currentPet.hunger + currentPet.energy + currentPet.social + currentPet.cleanliness + currentPet.curiosity;
+  currentPet.mood = clamp01(sum / 5.0f);
+}
+
+void initDefaultPet() {
+  strncpy(currentPet.name, "Cydy", sizeof(currentPet.name));
+  currentPet.name[sizeof(currentPet.name) - 1] = '\0';
+  currentPet.age = 0.0f;
+  currentPet.hunger = 0.5f;
+  currentPet.energy = 0.5f;
+  currentPet.social = 0.5f;
+  currentPet.cleanliness = 0.5f;
+  currentPet.curiosity = 0.5f;
+  updateMood();
+  petInitialized = true;
+}
+
+void addNeed(float &need, float delta) {
+  need = clamp01(need + delta);
+}
 
 // --- Dessins d'écrans ---
 void drawTitleScreen() {
@@ -85,6 +150,12 @@ void drawButton(const Button& b) {
   tft.drawString(b.label, b.x + b.w / 2, b.y + b.h / 2);
 }
 
+void drawNeedRow(const char* label, float value, int16_t x, int16_t y) {
+  char buffer[40];
+  snprintf(buffer, sizeof(buffer), "%s: %.0f%%", label, value * 100.0f);
+  tft.drawString(buffer, x, y);
+}
+
 // --- Déclarations écrans ---
 void drawMenuScreen();
 void drawNewPetScreen();
@@ -105,6 +176,7 @@ void changeScene(AppState next) {
       drawNewPetScreen();
       break;
     case STATE_GAME:
+      if (!petInitialized) initDefaultPet();
       drawGameScreen();
       break;
   }
@@ -188,23 +260,44 @@ void drawNewPetScreen() {
   tft.drawString("Nouveau Pet", SCREEN_W / 2, 40);
 
   tft.setTextFont(2);
-  tft.drawString("Setup rapide placeholder", SCREEN_W / 2, 100);
-
+  tft.drawString("Nom par defaut : Cydy", SCREEN_W / 2, 100);
+  
   for (size_t i = 0; i < NEWPET_BUTTON_COUNT; ++i) {
     drawButton(newPetButtons[i]);
   }
 }
 
 void drawGameScreen() {
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.setTextFont(4);
-  tft.drawString("GAME", SCREEN_W / 2, SCREEN_H / 2 - 20);
+  if (!petInitialized) {
+    initDefaultPet();
+  }
 
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
+  tft.drawString(String("Age: ") + String(currentPet.age, 1), 10, 28);
+
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  drawNeedRow("Humeur", currentPet.mood, 10, 46);
+
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft.drawString("Boucle de jeu a venir", SCREEN_W / 2, SCREEN_H / 2 + 20);
+  drawNeedRow("Hunger", currentPet.hunger, 10, 66);
+  drawNeedRow("Energy", currentPet.energy, 10, 82);
+  drawNeedRow("Social", currentPet.social, 10, 98);
+  drawNeedRow("Clean", currentPet.cleanliness, 10, 114);
+  drawNeedRow("Curio", currentPet.curiosity, 10, 130);
+
+  // Petit visage
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft.setTextFont(4);
+  tft.drawString("^_^", SCREEN_W - 70, 70);
+
+  for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
+    drawButton(gameButtons[i]);
+  }
 }
 
 
@@ -248,9 +341,57 @@ void loop() {
       break;
 
     case STATE_GAME:
-      // TODO: gérer les interactions du jeu principal
+      processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
       break;
   }
+}
+
+// --- Actions de gameplay ---
+void applyPlayerActionEat() {
+  addNeed(currentPet.hunger, 0.35f);
+  addNeed(currentPet.energy, 0.05f);
+  addNeed(currentPet.cleanliness, -0.05f);
+  updateMood();
+}
+
+void applyPlayerActionSleep() {
+  addNeed(currentPet.energy, 0.35f);
+  addNeed(currentPet.hunger, 0.10f);
+  updateMood();
+}
+
+void applyPlayerActionPlay() {
+  addNeed(currentPet.social, 0.25f);
+  addNeed(currentPet.curiosity, 0.20f);
+  addNeed(currentPet.energy, -0.15f);
+  addNeed(currentPet.cleanliness, -0.05f);
+  updateMood();
+}
+
+void applyPlayerActionWash() {
+  addNeed(currentPet.cleanliness, 0.40f);
+  addNeed(currentPet.energy, -0.05f);
+  updateMood();
+}
+
+void actionEat() {
+  applyPlayerActionEat();
+  drawGameScreen();
+}
+
+void actionSleep() {
+  applyPlayerActionSleep();
+  drawGameScreen();
+}
+
+void actionPlay() {
+  applyPlayerActionPlay();
+  drawGameScreen();
+}
+
+void actionWash() {
+  applyPlayerActionWash();
+  drawGameScreen();
 }
 
 // --- Actions de boutons ---
