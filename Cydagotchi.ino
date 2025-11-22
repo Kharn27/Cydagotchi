@@ -96,7 +96,9 @@ const size_t NEWPET_BUTTON_COUNT = sizeof(newPetButtons) / sizeof(newPetButtons[
 const size_t GAME_BUTTON_COUNT   = sizeof(gameButtons) / sizeof(gameButtons[0]);
 
 const unsigned long GAME_TICK_INTERVAL_MS = 400;
+const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
 unsigned long lastGameTickMillis = 0;
+unsigned long lastAutoActionMillis = 0;
 
 // --- Helpers Pet ---
 float clamp01(float v) {
@@ -173,6 +175,7 @@ void drawNeedRow(const char* label, float value, int16_t x, int16_t y) {
 void drawMenuScreen();
 void drawNewPetScreen();
 void drawGameScreen();
+void chooseAndApplyAutoAction();
 
 // --- Gestion centralisée des scènes ---
 void changeScene(AppState next) {
@@ -191,6 +194,7 @@ void changeScene(AppState next) {
     case STATE_GAME:
       if (!petInitialized) initDefaultPet();
       lastGameTickMillis = millis();
+      lastAutoActionMillis = lastGameTickMillis;
       drawGameScreen();
       break;
   }
@@ -357,7 +361,7 @@ void loop() {
     case STATE_GAME:
       processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
 
-      {
+      {          
         unsigned long now = millis();
         unsigned long elapsed = now - lastGameTickMillis;
         if (elapsed >= GAME_TICK_INTERVAL_MS) {
@@ -365,6 +369,11 @@ void loop() {
           lastGameTickMillis = now;
           updateNeeds(dtSeconds);
           drawGameScreen();
+        }
+
+        if (now - lastAutoActionMillis >= AUTO_ACTION_INTERVAL_MS) {
+          chooseAndApplyAutoAction();
+          lastAutoActionMillis = now;
         }
       }
       break;
@@ -401,21 +410,25 @@ void applyPlayerActionWash() {
 
 void actionEat() {
   applyPlayerActionEat();
+  lastAutoActionMillis = millis();
   drawGameScreen();
 }
 
 void actionSleep() {
   applyPlayerActionSleep();
+  lastAutoActionMillis = millis();
   drawGameScreen();
 }
 
 void actionPlay() {
   applyPlayerActionPlay();
+  lastAutoActionMillis = millis();
   drawGameScreen();
 }
 
 void actionWash() {
   applyPlayerActionWash();
+  lastAutoActionMillis = millis();
   drawGameScreen();
 }
 
@@ -434,4 +447,53 @@ void actionLoadPet() {
 void actionStartGameFromNewPet() {
   Serial.println("Starting game from NEW_PET");
   changeScene(STATE_GAME);
+}
+
+// --- Auto action utility AI ---
+void chooseAndApplyAutoAction() {
+  // Scores de manque (1 = besoin urgent)
+  float hungerNeed = 1.0f - currentPet.hunger;
+  float energyNeed = 1.0f - currentPet.energy;
+  float socialNeed = 1.0f - currentPet.social;
+  float cleanNeed  = 1.0f - currentPet.cleanliness;
+
+  float needScores[] = { hungerNeed, energyNeed, socialNeed, cleanNeed };
+  enum ActionIndex { ACT_EAT = 0, ACT_SLEEP, ACT_PLAY, ACT_WASH };
+
+  float maxScore = needScores[0];
+  for (size_t i = 1; i < 4; ++i) {
+    if (needScores[i] > maxScore) {
+      maxScore = needScores[i];
+    }
+  }
+
+  // Tolérance pour permettre un choix aléatoire entre besoins proches
+  const float tolerance = 0.05f;
+  ActionIndex candidates[4];
+  size_t candidateCount = 0;
+  for (size_t i = 0; i < 4; ++i) {
+    if (needScores[i] >= maxScore - tolerance) {
+      candidates[candidateCount++] = static_cast<ActionIndex>(i);
+    }
+  }
+
+  ActionIndex chosen = candidates[random(candidateCount)];
+
+  switch (chosen) {
+    case ACT_EAT:
+      applyPlayerActionEat();
+      break;
+    case ACT_SLEEP:
+      applyPlayerActionSleep();
+      break;
+    case ACT_PLAY:
+      applyPlayerActionPlay();
+      break;
+    case ACT_WASH:
+      applyPlayerActionWash();
+      break;
+  }
+
+  // Affichage après action auto
+  drawGameScreen();
 }
