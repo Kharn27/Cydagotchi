@@ -45,6 +45,9 @@ struct Pet {
 
 Pet currentPet;
 bool petInitialized = false;
+unsigned long lastGameTickMillis = 0;
+
+const unsigned long GAME_TICK_INTERVAL_MS = 400;  // 0.4 s par tick
 
 // --- Définition de boutons enrichis ---
 typedef void (*ButtonAction)();
@@ -105,6 +108,17 @@ float clamp01(float v) {
 void updateMood() {
   float sum = currentPet.hunger + currentPet.energy + currentPet.social + currentPet.cleanliness + currentPet.curiosity;
   currentPet.mood = clamp01(sum / 5.0f);
+}
+
+// Mise à jour passive des besoins (appelée en jeu)
+void updateNeeds(float dtSeconds) {
+  currentPet.hunger = clamp01(currentPet.hunger - 0.01f * dtSeconds);
+  currentPet.energy = clamp01(currentPet.energy - 0.008f * dtSeconds);
+  currentPet.social = clamp01(currentPet.social - 0.005f * dtSeconds);
+  currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * dtSeconds);
+  currentPet.curiosity = clamp01(currentPet.curiosity + 0.003f * dtSeconds);
+
+  updateMood();
 }
 
 void initDefaultPet() {
@@ -177,6 +191,7 @@ void changeScene(AppState next) {
       break;
     case STATE_GAME:
       if (!petInitialized) initDefaultPet();
+      lastGameTickMillis = millis();
       drawGameScreen();
       break;
   }
@@ -342,6 +357,17 @@ void loop() {
 
     case STATE_GAME:
       processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
+
+      {
+        unsigned long now = millis();
+        unsigned long elapsed = now - lastGameTickMillis;
+        if (elapsed >= GAME_TICK_INTERVAL_MS) {
+          float dtSeconds = elapsed / 1000.0f;
+          lastGameTickMillis = now;
+          updateNeeds(dtSeconds);
+          drawGameScreen();
+        }
+      }
       break;
   }
 }
