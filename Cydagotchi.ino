@@ -122,6 +122,7 @@ void updateNeeds(float dtSeconds) {
   currentPet.social      = clamp01(currentPet.social - 0.005f * dtSeconds);
   currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * dtSeconds);
   currentPet.curiosity   = clamp01(currentPet.curiosity + 0.003f * dtSeconds);
+  currentPet.age        += dtSeconds / 60.0f;  // 60 s réelles = 1 jour virtuel
 
   updateMood();
 }
@@ -179,6 +180,25 @@ void drawNeedRow(const char* label, float value, int16_t x, int16_t y) {
   char buffer[40];
   snprintf(buffer, sizeof(buffer), "%s: %.0f%%", label, value * 100.0f);
   tft.drawString(buffer, x, y);
+}
+
+// Dessine le visage du pet en fonction de son humeur
+void drawPetFace() {
+  const char* face = "-_-";
+  uint16_t color = TFT_LIGHTGREY;
+
+  if (currentPet.mood >= 0.7f) {
+    face = "^_^";
+    color = TFT_GREEN;
+  } else if (currentPet.mood < 0.4f) {
+    face = "T_T";
+    color = TFT_ORANGE;
+  }
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextFont(4);
+  tft.setTextColor(color, TFT_BLACK);
+  tft.drawString(face, SCREEN_W - 70, 70);
 }
 
 // --- Déclarations écrans ---
@@ -305,9 +325,15 @@ void drawGameScreen() {
   tft.setTextFont(2);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
-  tft.drawString(String("Age: ") + String(currentPet.age, 1), 10, 28);
+  tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
 
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  uint16_t moodColor = TFT_YELLOW;
+  if (currentPet.mood >= 0.7f) {
+    moodColor = TFT_GREEN;
+  } else if (currentPet.mood < 0.4f) {
+    moodColor = TFT_RED;
+  }
+  tft.setTextColor(moodColor, TFT_BLACK);
   drawNeedRow("Humeur", currentPet.mood, 10, 46);
 
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
@@ -318,10 +344,7 @@ void drawGameScreen() {
   drawNeedRow("Curio", currentPet.curiosity, 10, 130);
 
   // Petit visage
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.setTextFont(4);
-  tft.drawString("^_^", SCREEN_W - 70, 70);
+  drawPetFace();
 
   // --- Journal d'action (texte de ce qui vient de se passer) ---
   tft.setTextDatum(TL_DATUM);
