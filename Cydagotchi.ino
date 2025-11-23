@@ -370,6 +370,9 @@ void setup() {
   tft.init();
   tft.setRotation(1);
 
+  // >>> AJOUT TEST INVERSION <<<
+  tft.invertDisplay(true);   // ou false selon ce que tu vois
+
   changeScene(STATE_TITLE);
 }
 
