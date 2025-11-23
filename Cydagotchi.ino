@@ -32,6 +32,16 @@ enum AppState {
 AppState appState = STATE_TITLE;
 
 // --- Modèle de pet ---
+enum PersonalityType : uint8_t {
+  PERSO_EQUILIBRE = 0,
+  PERSO_GOURMAND,
+  PERSO_PARESSEUX,
+  PERSO_SOCIABLE,
+  PERSO_CURIEUX,
+  PERSO_MANIAQUE,
+  PERSO_COUNT
+};
+
 struct Pet {
   char name[16];
   float age;
@@ -41,6 +51,7 @@ struct Pet {
   float cleanliness;
   float curiosity;
   float mood;
+  PersonalityType personality;
 };
 
 Pet currentPet;
@@ -111,17 +122,45 @@ float clamp01(float v) {
   return v;
 }
 
+struct PersonalityModifiers {
+  const char* label;
+  float hungerMul;
+  float energyMul;
+  float socialMul;
+  float cleanMul;
+  float curioMul;
+};
+
+const PersonalityModifiers PERSONALITY_MODIFIERS[PERSO_COUNT] = {
+  { "Équilibré", 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
+  { "Gourmand", 1.4f, 1.0f, 1.0f, 1.0f, 1.0f },
+  { "Paresseux", 1.0f, 1.4f, 1.0f, 1.0f, 1.0f },
+  { "Sociable", 1.0f, 1.0f, 1.4f, 1.0f, 1.0f },
+  { "Curieux", 1.0f, 1.0f, 1.0f, 1.0f, 1.4f },
+  { "Maniaque", 1.0f, 1.0f, 1.0f, 1.4f, 1.0f }
+};
+
+const PersonalityModifiers& getPersonalityModifiers(const Pet& pet) {
+  return PERSONALITY_MODIFIERS[pet.personality];
+}
+
+const char* getPersonalityLabel(const Pet& pet) {
+  return getPersonalityModifiers(pet).label;
+}
+
 void updateMood() {
   float sum = currentPet.hunger + currentPet.energy + currentPet.social + currentPet.cleanliness + currentPet.curiosity;
   currentPet.mood = clamp01(sum / 5.0f);
 }
 
 void updateNeeds(float dtSeconds) {
-  currentPet.hunger      = clamp01(currentPet.hunger - 0.01f * dtSeconds);
-  currentPet.energy      = clamp01(currentPet.energy - 0.008f * dtSeconds);
-  currentPet.social      = clamp01(currentPet.social - 0.005f * dtSeconds);
-  currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * dtSeconds);
-  currentPet.curiosity   = clamp01(currentPet.curiosity + 0.003f * dtSeconds);
+  const PersonalityModifiers& mods = getPersonalityModifiers(currentPet);
+
+  currentPet.hunger      = clamp01(currentPet.hunger - 0.01f  * mods.hungerMul * dtSeconds);
+  currentPet.energy      = clamp01(currentPet.energy - 0.008f * mods.energyMul * dtSeconds);
+  currentPet.social      = clamp01(currentPet.social - 0.005f * mods.socialMul * dtSeconds);
+  currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * mods.cleanMul  * dtSeconds);
+  currentPet.curiosity   = clamp01(currentPet.curiosity + 0.003f * mods.curioMul * dtSeconds);
   currentPet.age        += dtSeconds / 60.0f;  // 1 minute réelle = 1 jour virtuel
 
   updateMood();
@@ -131,13 +170,17 @@ void initDefaultPet() {
   strncpy(currentPet.name, "Cydy", sizeof(currentPet.name));
   currentPet.name[sizeof(currentPet.name) - 1] = '\0';
   currentPet.age = 0.0f;
-  currentPet.hunger = 0.5f;
-  currentPet.energy = 0.5f;
-  currentPet.social = 0.5f;
-  currentPet.cleanliness = 0.5f;
-  currentPet.curiosity = 0.5f;
+  currentPet.hunger = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
+  currentPet.energy = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
+  currentPet.social = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
+  currentPet.cleanliness = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
+  currentPet.curiosity = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
+  currentPet.personality = static_cast<PersonalityType>(random(PERSO_COUNT));
   updateMood();
   petInitialized = true;
+  setLastAction("Nouveau pet cree", false);
+  Serial.print("Personnalite : ");
+  Serial.println(getPersonalityLabel(currentPet));
 }
 
 void addNeed(float &need, float delta) {
@@ -328,17 +371,19 @@ void drawGameScreen() {
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
   tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
+  tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
+  tft.drawString(String("Caractere: ") + getPersonalityLabel(currentPet), 10, 44);
 
   uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
   tft.setTextColor(moodColor, TFT_BLACK);
-  drawNeedRow("Humeur", currentPet.mood, 10, 46);
+  drawNeedRow("Humeur", currentPet.mood, 10, 60);
 
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  drawNeedRow("Hunger", currentPet.hunger, 10, 66);
-  drawNeedRow("Energy", currentPet.energy, 10, 82);
-  drawNeedRow("Social", currentPet.social, 10, 98);
-  drawNeedRow("Clean", currentPet.cleanliness, 10, 114);
-  drawNeedRow("Curio", currentPet.curiosity, 10, 130);
+  drawNeedRow("Hunger", currentPet.hunger, 10, 80);
+  drawNeedRow("Energy", currentPet.energy, 10, 96);
+  drawNeedRow("Social", currentPet.social, 10, 112);
+  drawNeedRow("Clean", currentPet.cleanliness, 10, 128);
+  drawNeedRow("Curio", currentPet.curiosity, 10, 144);
 
   // Petit visage
   drawPetFace();
@@ -360,6 +405,9 @@ void drawGameScreen() {
 
 void setup() {
   Serial.begin(115200);
+
+  // Seed RNG pour varier la personnalité et les stats de départ
+  randomSeed(analogRead(34));
 
   // --- TACTILE : démarrer le bus SPI dédié + init du contrôleur ---
   touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
