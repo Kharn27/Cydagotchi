@@ -46,6 +46,10 @@ struct Pet {
 Pet currentPet;
 bool petInitialized = false;
 
+// Journal d'action (dernière action effectuée)
+char lastActionText[32] = "Bienvenue !";
+bool lastActionIsAuto = false;
+
 // --- Définition de boutons enrichis ---
 typedef void (*ButtonAction)();
 
@@ -137,6 +141,12 @@ void initDefaultPet() {
 
 void addNeed(float &need, float delta) {
   need = clamp01(need + delta);
+}
+
+void setLastAction(const char* text, bool isAuto) {
+  strncpy(lastActionText, text, sizeof(lastActionText));
+  lastActionText[sizeof(lastActionText) - 1] = '\0';
+  lastActionIsAuto = isAuto;
 }
 
 // --- Dessins d'écrans ---
@@ -313,6 +323,15 @@ void drawGameScreen() {
   tft.setTextFont(4);
   tft.drawString("^_^", SCREEN_W - 70, 70);
 
+  // --- Journal d'action (texte de ce qui vient de se passer) ---
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(2);
+  uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
+  tft.setTextColor(color, TFT_BLACK);
+  // Placé juste au-dessus de la rangée de boutons (y=180)
+  tft.drawString(lastActionText, 10, 160);
+
+  // Boutons d'action
   for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
     drawButton(gameButtons[i]);
   }
@@ -360,7 +379,6 @@ void loop() {
 
     case STATE_GAME:
       processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
-
       {          
         unsigned long now = millis();
         unsigned long elapsed = now - lastGameTickMillis;
@@ -368,11 +386,12 @@ void loop() {
           float dtSeconds = static_cast<float>(elapsed) / 1000.0f;
           lastGameTickMillis = now;
           updateNeeds(dtSeconds);
-          drawGameScreen();
+          // On met juste à jour la logique, sans redessiner à chaque tick
         }
-
+    
+        // Les auto-actions, elles, redessinent l'écran
         if (now - lastAutoActionMillis >= AUTO_ACTION_INTERVAL_MS) {
-          chooseAndApplyAutoAction();
+          chooseAndApplyAutoAction();   // cette fonction appelle déjà drawGameScreen()
           lastAutoActionMillis = now;
         }
       }
@@ -410,25 +429,29 @@ void applyPlayerActionWash() {
 
 void actionEat() {
   applyPlayerActionEat();
-  lastAutoActionMillis = millis();
+  lastAutoActionMillis = millis();             // reset du timer auto
+  setLastAction("Tu lui donnes à manger", false);
   drawGameScreen();
 }
 
 void actionSleep() {
   applyPlayerActionSleep();
   lastAutoActionMillis = millis();
+  setLastAction("Tu le mets au dodo", false);
   drawGameScreen();
 }
 
 void actionPlay() {
   applyPlayerActionPlay();
   lastAutoActionMillis = millis();
+  setLastAction("Tu joues avec lui", false);
   drawGameScreen();
 }
 
 void actionWash() {
   applyPlayerActionWash();
   lastAutoActionMillis = millis();
+  setLastAction("Tu le laves", false);
   drawGameScreen();
 }
 
@@ -482,15 +505,19 @@ void chooseAndApplyAutoAction() {
   switch (chosen) {
     case ACT_EAT:
       applyPlayerActionEat();
+      setLastAction("Cydy va manger tout seul", true);
       break;
     case ACT_SLEEP:
       applyPlayerActionSleep();
+      setLastAction("Cydy va dormir tout seul", true);
       break;
     case ACT_PLAY:
       applyPlayerActionPlay();
+      setLastAction("Cydy joue tout seul", true);
       break;
     case ACT_WASH:
       applyPlayerActionWash();
+      setLastAction("Cydy se lave tout seul", true);
       break;
   }
 
