@@ -46,7 +46,7 @@ void updateNeeds(float dtSeconds) {
   updateMood();
 }
 
-void initDefaultPet() {
+void initPetWithPersonality(PersonalityType p) {
   strncpy(currentPet.name, "Cydy", sizeof(currentPet.name));
   currentPet.name[sizeof(currentPet.name) - 1] = '\0';
   currentPet.age = 0.0f;
@@ -55,9 +55,14 @@ void initDefaultPet() {
   currentPet.social = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
   currentPet.cleanliness = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
   currentPet.curiosity = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.personality = static_cast<PersonalityType>(random(PERSO_COUNT));
+  currentPet.personality = p;
   updateMood();
   petInitialized = true;
   Serial.print("Personnalite : ");
   Serial.println(PERSONALITY_MODIFIERS[currentPet.personality].label);
+}
+
+void initDefaultPet() {
+  PersonalityType randomPerso = static_cast<PersonalityType>(random(PERSO_COUNT));
+  initPetWithPersonality(randomPerso);
 }
