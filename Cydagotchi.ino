@@ -5,6 +5,8 @@
 //#include <XPT2046_Touchscreen.h>       // << je te conseille la lib officielle
  #include <XPT2046_Touchscreen_TT.h>  // tu peux commenter celle-là
 
+#include "PetModel.h"
+
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
 #define XPT2046_MISO 39
@@ -30,32 +32,6 @@ enum AppState {
 };
 
 AppState appState = STATE_TITLE;
-
-// --- Modèle de pet ---
-enum PersonalityType : uint8_t {
-  PERSO_EQUILIBRE = 0,
-  PERSO_GOURMAND,
-  PERSO_PARESSEUX,
-  PERSO_SOCIABLE,
-  PERSO_CURIEUX,
-  PERSO_MANIAQUE,
-  PERSO_COUNT
-};
-
-struct Pet {
-  char name[16];
-  float age;
-  float hunger;
-  float energy;
-  float social;
-  float cleanliness;
-  float curiosity;
-  float mood;
-  PersonalityType personality;
-};
-
-Pet currentPet;
-bool petInitialized = false;
 
 // Journal d'action (dernière action effectuée)
 char lastActionText[32] = "Bienvenue !";
@@ -87,7 +63,6 @@ void applyPlayerActionEat();
 void applyPlayerActionSleep();
 void applyPlayerActionPlay();
 void applyPlayerActionWash();
-void updateMood();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
@@ -114,72 +89,6 @@ const unsigned long GAME_TICK_INTERVAL_MS = 400;
 const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
 unsigned long lastGameTickMillis = 0;
 unsigned long lastAutoActionMillis = 0;
-
-// --- Helpers Pet ---
-float clamp01(float v) {
-  if (v < 0.0f) return 0.0f;
-  if (v > 1.0f) return 1.0f;
-  return v;
-}
-
-struct PersonalityModifiers {
-  const char* label;
-  float hungerMul;
-  float energyMul;
-  float socialMul;
-  float cleanMul;
-  float curioMul;
-};
-
-const PersonalityModifiers PERSONALITY_MODIFIERS[PERSO_COUNT] = {
-  { "Équilibré", 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
-  { "Gourmand", 1.4f, 1.0f, 1.0f, 1.0f, 1.0f },
-  { "Paresseux", 1.0f, 1.4f, 1.0f, 1.0f, 1.0f },
-  { "Sociable", 1.0f, 1.0f, 1.4f, 1.0f, 1.0f },
-  { "Curieux", 1.0f, 1.0f, 1.0f, 1.0f, 1.4f },
-  { "Maniaque", 1.0f, 1.0f, 1.0f, 1.4f, 1.0f }
-};
-
-void updateMood() {
-  float sum = currentPet.hunger + currentPet.energy + currentPet.social + currentPet.cleanliness + currentPet.curiosity;
-  currentPet.mood = clamp01(sum / 5.0f);
-}
-
-void updateNeeds(float dtSeconds) {
-  const PersonalityModifiers& mods = PERSONALITY_MODIFIERS[currentPet.personality];
-
-  currentPet.hunger      = clamp01(currentPet.hunger - 0.01f  * mods.hungerMul * dtSeconds);
-  currentPet.energy      = clamp01(currentPet.energy - 0.008f * mods.energyMul * dtSeconds);
-  currentPet.social      = clamp01(currentPet.social - 0.005f * mods.socialMul * dtSeconds);
-  currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * mods.cleanMul  * dtSeconds);
-  currentPet.curiosity   = clamp01(currentPet.curiosity + 0.003f * mods.curioMul * dtSeconds);
-  currentPet.age        += dtSeconds / 60.0f;
-
-  updateMood();
-}
-
-
-
-void initDefaultPet() {
-  strncpy(currentPet.name, "Cydy", sizeof(currentPet.name));
-  currentPet.name[sizeof(currentPet.name) - 1] = '\0';
-  currentPet.age = 0.0f;
-  currentPet.hunger = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.energy = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.social = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.cleanliness = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.curiosity = clamp01(0.5f + (static_cast<float>(random(-10, 11)) / 100.0f));
-  currentPet.personality = static_cast<PersonalityType>(random(PERSO_COUNT));
-  updateMood();
-  petInitialized = true;
-  setLastAction("Nouveau pet cree", false);
-  Serial.print("Personnalite : ");
-  Serial.println(PERSONALITY_MODIFIERS[currentPet.personality].label);
-}
-
-void addNeed(float &need, float delta) {
-  need = clamp01(need + delta);
-}
 
 void setLastAction(const char* text, bool isAuto) {
   strncpy(lastActionText, text, sizeof(lastActionText));
@@ -261,7 +170,10 @@ void changeScene(AppState next) {
       drawNewPetScreen();
       break;
     case STATE_GAME:
-      if (!petInitialized) initDefaultPet();
+      if (!petInitialized) {
+        initDefaultPet();
+        setLastAction("Nouveau pet cree", false);
+      }
       lastGameTickMillis = millis();
       lastAutoActionMillis = lastGameTickMillis;
       drawGameScreen();
@@ -367,7 +279,6 @@ void drawGameScreen() {
   tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
   tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
   tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
-
 
   uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
   tft.setTextColor(moodColor, TFT_BLACK);
