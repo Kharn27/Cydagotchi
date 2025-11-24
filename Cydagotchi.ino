@@ -178,6 +178,8 @@ void drawPetFace() {
 void drawMenuScreen();
 void drawNewPetScreen();
 void drawGameScreen();
+void drawGameScreenStatic();
+void drawGameScreenDynamic();
 void chooseAndApplyAutoAction();
 
 // --- Gestion centralisée des scènes ---
@@ -220,7 +222,8 @@ void changeScene(AppState next) {
       lastAutoActionMillis = lastGameTickMillis;
       lastRedrawMillis = lastGameTickMillis;
       lastAutoSaveMillis = lastGameTickMillis;
-      drawGameScreen();
+      drawGameScreenStatic();
+      drawGameScreenDynamic();
       break;
   }
 }
@@ -315,8 +318,18 @@ void drawNewPetScreen() {
   }
 }
 
-void drawGameScreen() {
+void drawGameScreenStatic() {
   tft.fillScreen(TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(2);
+
+  // Boutons d'action
+  for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
+    drawButton(gameButtons[i]);
+  }
+}
+
+void drawGameScreenDynamic() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -348,11 +361,11 @@ void drawGameScreen() {
   tft.setTextColor(color, TFT_BLACK);
   // Placé juste au-dessus de la rangée de boutons (y=180)
   tft.drawString(lastActionText, 10, 176);
+}
 
-  // Boutons d'action
-  for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
-    drawButton(gameButtons[i]);
-  }
+void drawGameScreen() {
+  drawGameScreenStatic();
+  drawGameScreenDynamic();
 }
 
 
@@ -418,7 +431,7 @@ void loop() {
     
         // Les auto-actions, elles, redessinent l'écran
         if (now - lastAutoActionMillis >= AUTO_ACTION_INTERVAL_MS) {
-          chooseAndApplyAutoAction();   // cette fonction appelle déjà drawGameScreen()
+          chooseAndApplyAutoAction();   // cette fonction appelle déjà drawGameScreenDynamic()
           lastAutoActionMillis = now;
         }
 
@@ -428,7 +441,7 @@ void loop() {
         }
 
         if (now - lastRedrawMillis >= GAME_REDRAW_INTERVAL_MS) {
-          drawGameScreen();
+          drawGameScreenDynamic();
           lastRedrawMillis = now;
         }
       }
@@ -441,7 +454,7 @@ void actionEat() {
   lastAutoActionMillis = millis();             // reset du timer auto
   setLastAction("Tu lui donnes à manger", false);
   petSaveToStorage();
-  drawGameScreen();
+  drawGameScreenDynamic();
 }
 
 void actionSleep() {
@@ -449,7 +462,7 @@ void actionSleep() {
   lastAutoActionMillis = millis();
   setLastAction("Tu le mets au dodo", false);
   petSaveToStorage();
-  drawGameScreen();
+  drawGameScreenDynamic();
 }
 
 void actionPlay() {
@@ -457,7 +470,7 @@ void actionPlay() {
   lastAutoActionMillis = millis();
   setLastAction("Tu joues avec lui", false);
   petSaveToStorage();
-  drawGameScreen();
+  drawGameScreenDynamic();
 }
 
 void actionWash() {
@@ -465,7 +478,7 @@ void actionWash() {
   lastAutoActionMillis = millis();
   setLastAction("Tu le laves", false);
   petSaveToStorage();
-  drawGameScreen();
+  drawGameScreenDynamic();
 }
 
 // --- Actions de boutons ---
@@ -556,5 +569,5 @@ void chooseAndApplyAutoAction() {
   }
 
   // Affichage après action auto
-  drawGameScreen();
+  drawGameScreenDynamic();
 }
