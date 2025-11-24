@@ -5,7 +5,7 @@
 
 static Preferences prefs;
 static const char* NAMESPACE = "cydagotchi";
-static const uint8_t DATA_VERSION = 1;
+static const uint8_t DATA_VERSION = 2;
 
 void petStorageBegin() {
   prefs.begin(NAMESPACE, false); // false = lecture/écriture
@@ -22,13 +22,14 @@ void petSaveToStorage() {
   prefs.putFloat("curio", currentPet.curiosity);
   prefs.putFloat("mood", currentPet.mood);
   prefs.putUChar("perso", static_cast<uint8_t>(currentPet.personality));
+  prefs.putUChar("stage", static_cast<uint8_t>(currentPet.lifeStage));
 
   Serial.println("[Storage] Pet saved");
 }
 
 bool petLoadFromStorage() {
   uint8_t v = prefs.getUChar("version", 0);
-  if (v != DATA_VERSION) {
+  if (v != DATA_VERSION && v != 1) {
     Serial.println("[Storage] No valid save (version mismatch)");
     return false;
   }
@@ -53,6 +54,17 @@ bool petLoadFromStorage() {
   uint8_t persoRaw = prefs.getUChar("perso", 0);
   if (persoRaw >= PERSO_COUNT) persoRaw = 0;
   currentPet.personality = static_cast<PersonalityType>(persoRaw);
+
+  if (v >= 2) {
+    uint8_t stageRaw = prefs.getUChar("stage", static_cast<uint8_t>(computeLifeStage(currentPet.age)));
+    if (stageRaw >= STAGE_COUNT) stageRaw = static_cast<uint8_t>(computeLifeStage(currentPet.age));
+    currentPet.lifeStage = static_cast<LifeStage>(stageRaw);
+  } else {
+    currentPet.lifeStage = computeLifeStage(currentPet.age);
+  }
+
+  // Sécurise la cohérence avec l'âge si la formule évolue
+  currentPet.lifeStage = computeLifeStage(currentPet.age);
 
   petInitialized = true;
   Serial.println("[Storage] Pet loaded from storage");
