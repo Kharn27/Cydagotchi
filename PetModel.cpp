@@ -9,7 +9,7 @@ static LifeStage lastLifeStageForEvents = STAGE_BABY;
 static bool lifeStageJustChanged = false;
 
 const PersonalityModifiers PERSONALITY_MODIFIERS[PERSO_COUNT] = {
-  { "Équilibré", 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
+  { "Equilibre", 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
   { "Gourmand", 1.4f, 1.0f, 1.0f, 1.0f, 1.0f },
   { "Paresseux", 1.0f, 1.4f, 1.0f, 1.0f, 1.0f },
   { "Sociable", 1.0f, 1.0f, 1.4f, 1.0f, 1.0f },
