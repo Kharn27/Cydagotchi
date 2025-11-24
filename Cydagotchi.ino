@@ -121,6 +121,37 @@ void setLastAction(const char* text, bool isAuto) {
   lastActionIsAuto = isAuto;
 }
 
+const char* getLifeStageChangeMessage(LifeStage stage) {
+  switch (stage) {
+    case STAGE_BABY: return "Cydy vient de naitre !";
+    case STAGE_TEEN: return "Cydy devient ado !";
+    case STAGE_ADULT: return "Cydy est maintenant adulte !";
+    case STAGE_SENIOR: return "Cydy devient un vieux sage !";
+    default: return "Cydy evolue !";
+  }
+}
+
+void applyLifeStageChangeEffects(LifeStage newStage) {
+  switch (newStage) {
+    case STAGE_TEEN:
+      addNeed(currentPet.curiosity, 0.10f);
+      addNeed(currentPet.social, 0.10f);
+      break;
+    case STAGE_ADULT:
+      addNeed(currentPet.energy, 0.05f);
+      addNeed(currentPet.hunger, 0.05f);
+      break;
+    case STAGE_SENIOR:
+      addNeed(currentPet.social, 0.08f);
+      addNeed(currentPet.energy, -0.05f);
+      break;
+    default:
+      break;
+  }
+
+  updateMood();
+}
+
 // --- Dessins d'écrans ---
 void drawTitleScreen() {
   tft.fillScreen(TFT_BLACK);
@@ -359,6 +390,7 @@ void drawGameScreenDynamic() {
   tft.setTextFont(2);
   uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
   tft.setTextColor(color, TFT_BLACK);
+  tft.fillRect(0, 170, SCREEN_W, 30, TFT_BLACK);
   // Placé juste au-dessus de la rangée de boutons (y=180)
   tft.drawString(lastActionText, 10, 176);
 }
@@ -426,6 +458,12 @@ void loop() {
           float dtSeconds = static_cast<float>(elapsed) / 1000.0f;
           lastGameTickMillis = now;
           updateNeeds(dtSeconds);
+          if (petLifeStageJustChanged()) {
+            setLastAction(getLifeStageChangeMessage(currentPet.lifeStage), false);
+            applyLifeStageChangeEffects(currentPet.lifeStage);
+            drawGameScreenDynamic();
+            clearLifeStageChangedFlag();
+          }
           // On met juste à jour la logique, sans redessiner à chaque tick
         }
     
