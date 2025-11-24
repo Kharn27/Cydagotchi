@@ -64,10 +64,10 @@ Button bottomMenuButtons[] = {
   { bottomButtonWidth * 2, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Duel", TFT_RED, TFT_WHITE, HUD_BORDER_COLOR, actionDuel }
 };
 
-const size_t MENU_BUTTON_COUNT      = sizeof(menuButtons) / sizeof(menuButtons[0]);
-const size_t NEWPET_BUTTON_COUNT    = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
-const size_t TOPMENU_BUTTON_COUNT   = sizeof(topMenuButtons) / sizeof(topMenuButtons[0]);
-const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
+extern const size_t MENU_BUTTON_COUNT      = sizeof(menuButtons) / sizeof(menuButtons[0]);
+extern const size_t NEWPET_BUTTON_COUNT    = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
+extern const size_t TOPMENU_BUTTON_COUNT   = sizeof(topMenuButtons) / sizeof(topMenuButtons[0]);
+extern const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
 
 const unsigned long GAME_TICK_INTERVAL_MS = 400;
 const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;

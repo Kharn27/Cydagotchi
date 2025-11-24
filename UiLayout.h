@@ -1,6 +1,7 @@
 #pragma once
 
 #include <TFT_eSPI.h>
+#include <cstddef>
 #include "PetModel.h"
 
 // Shared screen layout constants
@@ -47,6 +48,12 @@ struct Button {
 
 // Global display instance comes from Cydagotchi.ino
 extern TFT_eSPI tft;
+
+// Button counts defined in Cydagotchi.ino (extern to allow cross-file access)
+extern const size_t MENU_BUTTON_COUNT;
+extern const size_t NEWPET_BUTTON_COUNT;
+extern const size_t TOPMENU_BUTTON_COUNT;
+extern const size_t BOTTOMMENU_BUTTON_COUNT;
 
 void drawButton(const Button& b);
 void drawNeedRow(const char* label, float value, int16_t x, int16_t y);
