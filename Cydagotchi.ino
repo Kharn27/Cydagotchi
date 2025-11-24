@@ -1,6 +1,7 @@
 // Bibliothèques principales
 #include <SPI.h>
 #include <cstring>
+#include <cmath>
 #include <TFT_eSPI.h>
 //#include <XPT2046_Touchscreen.h>       // << je te conseille la lib officielle
  #include <XPT2046_Touchscreen_TT.h>  // tu peux commenter celle-là
@@ -121,12 +122,22 @@ void setLastAction(const char* text, bool isAuto) {
   lastActionIsAuto = isAuto;
 }
 
-const char* getLifeStageChangeMessage(LifeStage stage) {
-  switch (stage) {
+const char* getLifeStageChangeMessage(LifeStage previousStage, LifeStage newStage) {
+  if (previousStage == STAGE_BABY && newStage == STAGE_TEEN) {
+    return "Cydy quitte l'enfance !";
+  }
+  if (previousStage == STAGE_TEEN && newStage == STAGE_ADULT) {
+    return "Cydy atteint l'age adulte";
+  }
+  if (previousStage == STAGE_ADULT && newStage == STAGE_SENIOR) {
+    return "Cydy devient un vieux sage";
+  }
+
+  switch (newStage) {
     case STAGE_BABY: return "Cydy vient de naitre !";
     case STAGE_TEEN: return "Cydy devient ado !";
     case STAGE_ADULT: return "Cydy est maintenant adulte !";
-    case STAGE_SENIOR: return "Cydy devient un vieux sage !";
+    case STAGE_SENIOR: return "Cydy prend de l'age";
     default: return "Cydy evolue !";
   }
 }
@@ -134,16 +145,17 @@ const char* getLifeStageChangeMessage(LifeStage stage) {
 void applyLifeStageChangeEffects(LifeStage newStage) {
   switch (newStage) {
     case STAGE_TEEN:
-      addNeed(currentPet.curiosity, 0.10f);
-      addNeed(currentPet.social, 0.10f);
+      addNeed(currentPet.curiosity, 0.15f);
+      addNeed(currentPet.social, 0.12f);
+      addNeed(currentPet.cleanliness, -0.05f);
       break;
     case STAGE_ADULT:
-      addNeed(currentPet.energy, 0.05f);
-      addNeed(currentPet.hunger, 0.05f);
+      addNeed(currentPet.energy, 0.10f);
+      addNeed(currentPet.hunger, 0.08f);
       break;
     case STAGE_SENIOR:
-      addNeed(currentPet.social, 0.08f);
-      addNeed(currentPet.energy, -0.05f);
+      addNeed(currentPet.social, 0.10f);
+      addNeed(currentPet.energy, -0.12f);
       break;
     default:
       break;
@@ -247,7 +259,9 @@ void changeScene(AppState next) {
         } else {
           initDefaultPet();
         }
-        setLastAction("Nouveau pet cree", false);
+        char birthMsg[32];
+        snprintf(birthMsg, sizeof(birthMsg), "%s vient de naitre", currentPet.name);
+        setLastAction(birthMsg, false);
       }
       lastGameTickMillis = millis();
       lastAutoActionMillis = lastGameTickMillis;
@@ -361,38 +375,76 @@ void drawGameScreenStatic() {
 }
 
 void drawGameScreenDynamic() {
+  static Pet cachedPet = {};
+  static bool drawInitialized = false;
+  static char cachedAction[sizeof(lastActionText)] = "";
+  static bool cachedActionAuto = false;
+
+  auto valueChanged = [](float a, float b, float epsilon) {
+    return fabsf(a - b) >= epsilon;
+  };
+
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
-  tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
-  tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
-  tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-  tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
-  tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
-  tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, 60);
 
-  uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
-  tft.setTextColor(moodColor, TFT_BLACK);
-  drawNeedRow("Humeur", currentPet.mood, 10, 76);
+  bool headerDirty = !drawInitialized || strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
+                     cachedPet.personality != currentPet.personality || cachedPet.lifeStage != currentPet.lifeStage ||
+                     valueChanged(cachedPet.age, currentPet.age, 0.05f);
+  bool needsDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.01f) ||
+                    valueChanged(cachedPet.hunger, currentPet.hunger, 0.01f) ||
+                    valueChanged(cachedPet.energy, currentPet.energy, 0.01f) ||
+                    valueChanged(cachedPet.social, currentPet.social, 0.01f) ||
+                    valueChanged(cachedPet.cleanliness, currentPet.cleanliness, 0.01f) ||
+                    valueChanged(cachedPet.curiosity, currentPet.curiosity, 0.01f);
+  bool faceDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.02f);
+  bool actionDirty = !drawInitialized || cachedActionAuto != lastActionIsAuto ||
+                     strncmp(cachedAction, lastActionText, sizeof(lastActionText)) != 0;
 
-  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  drawNeedRow("Hunger", currentPet.hunger, 10, 96);
-  drawNeedRow("Energy", currentPet.energy, 10, 112);
-  drawNeedRow("Social", currentPet.social, 10, 128);
-  drawNeedRow("Clean", currentPet.cleanliness, 10, 144);
-  drawNeedRow("Curio", currentPet.curiosity, 10, 160);
+  if (headerDirty) {
+    tft.fillRect(0, 0, 210, 70, TFT_BLACK);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
+    tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
+    tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
+    tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
+    tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+    tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, 60);
+  }
 
-  // Petit visage
-  drawPetFace();
+  if (needsDirty) {
+    tft.fillRect(0, 70, 210, 100, TFT_BLACK);
+    uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
+    tft.setTextColor(moodColor, TFT_BLACK);
+    drawNeedRow("Humeur", currentPet.mood, 10, 76);
 
-  // --- Journal d'action (texte de ce qui vient de se passer) ---
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextFont(2);
-  uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
-  tft.setTextColor(color, TFT_BLACK);
-  tft.fillRect(0, 170, SCREEN_W, 30, TFT_BLACK);
-  // Placé juste au-dessus de la rangée de boutons (y=180)
-  tft.drawString(lastActionText, 10, 176);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    drawNeedRow("Hunger", currentPet.hunger, 10, 96);
+    drawNeedRow("Energy", currentPet.energy, 10, 112);
+    drawNeedRow("Social", currentPet.social, 10, 128);
+    drawNeedRow("Clean", currentPet.cleanliness, 10, 144);
+    drawNeedRow("Curio", currentPet.curiosity, 10, 160);
+  }
+
+  if (faceDirty) {
+    tft.fillRect(SCREEN_W - 120, 40, 100, 60, TFT_BLACK);
+    drawPetFace();
+  }
+
+  if (actionDirty) {
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(2);
+    uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
+    tft.setTextColor(color, TFT_BLACK);
+    tft.fillRect(0, 170, SCREEN_W, 30, TFT_BLACK);
+    // Placé juste au-dessus de la rangée de boutons (y=180)
+    tft.drawString(lastActionText, 10, 176);
+    strncpy(cachedAction, lastActionText, sizeof(cachedAction));
+    cachedAction[sizeof(cachedAction) - 1] = '\0';
+    cachedActionAuto = lastActionIsAuto;
+  }
+
+  cachedPet = currentPet;
+  drawInitialized = true;
 }
 
 void drawGameScreen() {
@@ -459,7 +511,7 @@ void loop() {
           lastGameTickMillis = now;
           updateNeeds(dtSeconds);
           if (petLifeStageJustChanged()) {
-            setLastAction(getLifeStageChangeMessage(currentPet.lifeStage), false);
+            setLastAction(getLifeStageChangeMessage(getLastLifeStageForEvents(), currentPet.lifeStage), false);
             applyLifeStageChangeEffects(currentPet.lifeStage);
             drawGameScreenDynamic();
             clearLifeStageChangedFlag();

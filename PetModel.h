@@ -58,6 +58,7 @@ void initDefaultPet();
 void initPetWithPersonality(PersonalityType p, const char* name);
 void addNeed(float& need, float delta);
 const char* getLifeStageLabel(LifeStage stage);
+LifeStage getLastLifeStageForEvents();
 bool petLifeStageJustChanged();
 void clearLifeStageChangedFlag();
 void syncLifeStageForEvents();
