@@ -267,10 +267,6 @@ void drawNewPetScreen() {
 }
 
 void drawGameScreen() {
-  if (!petInitialized) {
-    initDefaultPet();
-  }
-
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
