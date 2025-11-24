@@ -58,11 +58,9 @@ LifeStage computeLifeStage(float age) {
 void updateLifeStage() {
   LifeStage newStage = computeLifeStage(currentPet.age);
   if (newStage != currentPet.lifeStage) {
+    lastLifeStageForEvents = currentPet.lifeStage;
     currentPet.lifeStage = newStage;
     lifeStageJustChanged = true;
-    lastLifeStageForEvents = newStage;
-  } else {
-    lifeStageJustChanged = false;
   }
 }
 
@@ -74,6 +72,10 @@ const char* getLifeStageLabel(LifeStage stage) {
     case STAGE_SENIOR: return "Vieux";
     default: return "?";
   }
+}
+
+LifeStage getLastLifeStageForEvents() {
+  return lastLifeStageForEvents;
 }
 
 bool petLifeStageJustChanged() {
@@ -119,6 +121,7 @@ void initPetWithPersonality(PersonalityType p, const char* name) {
 
   currentPet.personality = p;
   currentPet.lifeStage = STAGE_BABY;
+  syncLifeStageForEvents();
   updateMood();
   petInitialized = true;
 
