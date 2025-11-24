@@ -38,6 +38,10 @@ AppState appState = STATE_TITLE;
 char lastActionText[32] = "Bienvenue !";
 bool lastActionIsAuto = false;
 
+// Sélection de personnalité pour l'écran NEW_PET
+PersonalityType newPetPersonality = PERSO_EQUILIBRE;
+bool hasNewPetPersonality = false;
+
 // --- Définition de boutons enrichis ---
 typedef void (*ButtonAction)();
 
@@ -58,6 +62,8 @@ void actionEat();
 void actionSleep();
 void actionPlay();
 void actionWash();
+void actionPrevPersonality();
+void actionNextPersonality();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
@@ -66,7 +72,9 @@ Button menuButtons[] = {
 };
 
 Button newPetButtons[] = {
-  { 70, 170, 180, 40, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
+  { 40, 150, 50, 30, "<",  TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionPrevPersonality },
+  { 230, 150, 50, 30, ">", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionNextPersonality },
+  { 70, 190, 180, 40, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
 };
 
 Button gameButtons[] = {
@@ -164,11 +172,19 @@ void changeScene(AppState next) {
       drawMenuScreen();
       break;
     case STATE_NEW_PET:
+      if (!hasNewPetPersonality) {
+        newPetPersonality = PERSO_EQUILIBRE;
+        hasNewPetPersonality = true;
+      }
       drawNewPetScreen();
       break;
     case STATE_GAME:
       if (!petInitialized) {
-        initDefaultPet();
+        if (hasNewPetPersonality) {
+          initPetWithPersonality(newPetPersonality);
+        } else {
+          initDefaultPet();
+        }
         setLastAction("Nouveau pet cree", false);
       }
       lastGameTickMillis = millis();
@@ -258,7 +274,11 @@ void drawNewPetScreen() {
 
   tft.setTextFont(2);
   tft.drawString("Nom par defaut : Cydy", SCREEN_W / 2, 100);
-  
+
+  String persoLine = String("Personnalite : ") +
+                     PERSONALITY_MODIFIERS[newPetPersonality].label;
+  tft.drawString(persoLine, SCREEN_W / 2, 130);
+
   for (size_t i = 0; i < NEWPET_BUTTON_COUNT; ++i) {
     drawButton(newPetButtons[i]);
   }
@@ -411,6 +431,8 @@ void actionStartNewPet() {
 
 void actionLoadPet() {
   Serial.println("Load Pet selected");
+  hasNewPetPersonality = false;
+  petInitialized = false;
   // En attendant le module de chargement, on entre en jeu directement
   changeScene(STATE_GAME);
 }
@@ -421,6 +443,20 @@ void actionStartGameFromNewPet() {
   // Force la création d'un nouveau pet lors de l'entrée en jeu
   petInitialized = false;
   changeScene(STATE_GAME);
+}
+
+void actionPrevPersonality() {
+  if (newPetPersonality == 0) {
+    newPetPersonality = static_cast<PersonalityType>(PERSO_COUNT - 1);
+  } else {
+    newPetPersonality = static_cast<PersonalityType>(newPetPersonality - 1);
+  }
+  drawNewPetScreen();
+}
+
+void actionNextPersonality() {
+  newPetPersonality = static_cast<PersonalityType>((newPetPersonality + 1) % PERSO_COUNT);
+  drawNewPetScreen();
 }
 
 // --- Auto action utility AI ---

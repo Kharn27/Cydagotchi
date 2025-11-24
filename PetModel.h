@@ -44,6 +44,7 @@ float clamp01(float v);
 void updateMood();
 void updateNeeds(float dtSeconds);
 void initDefaultPet();
+void initPetWithPersonality(PersonalityType p);
 void addNeed(float& need, float delta);
 
 #endif // PET_MODEL_H
