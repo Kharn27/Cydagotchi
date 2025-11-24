@@ -23,6 +23,14 @@ struct PersonalityModifiers {
   float curioMul;
 };
 
+enum LifeStage : uint8_t {
+  STAGE_BABY = 0,
+  STAGE_TEEN,
+  STAGE_ADULT,
+  STAGE_SENIOR,
+  STAGE_COUNT
+};
+
 struct Pet {
   char name[16];
   float age;
@@ -33,6 +41,7 @@ struct Pet {
   float curiosity;
   float mood;
   PersonalityType personality;
+  LifeStage lifeStage;
 };
 
 extern Pet currentPet;
@@ -43,8 +52,11 @@ float clamp01(float v);
 
 void updateMood();
 void updateNeeds(float dtSeconds);
+LifeStage computeLifeStage(float age);
+void updateLifeStage();
 void initDefaultPet();
 void initPetWithPersonality(PersonalityType p, const char* name);
 void addNeed(float& need, float delta);
+const char* getLifeStageLabel(LifeStage stage);
 
 #endif // PET_MODEL_H

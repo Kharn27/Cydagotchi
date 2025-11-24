@@ -324,17 +324,19 @@ void drawGameScreen() {
   tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
   tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
   tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
+  tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+  tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, 60);
 
   uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
   tft.setTextColor(moodColor, TFT_BLACK);
-  drawNeedRow("Humeur", currentPet.mood, 10, 60);
+  drawNeedRow("Humeur", currentPet.mood, 10, 76);
 
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  drawNeedRow("Hunger", currentPet.hunger, 10, 80);
-  drawNeedRow("Energy", currentPet.energy, 10, 96);
-  drawNeedRow("Social", currentPet.social, 10, 112);
-  drawNeedRow("Clean", currentPet.cleanliness, 10, 128);
-  drawNeedRow("Curio", currentPet.curiosity, 10, 144);
+  drawNeedRow("Hunger", currentPet.hunger, 10, 96);
+  drawNeedRow("Energy", currentPet.energy, 10, 112);
+  drawNeedRow("Social", currentPet.social, 10, 128);
+  drawNeedRow("Clean", currentPet.cleanliness, 10, 144);
+  drawNeedRow("Curio", currentPet.curiosity, 10, 160);
 
   // Petit visage
   drawPetFace();
@@ -345,7 +347,7 @@ void drawGameScreen() {
   uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
   tft.setTextColor(color, TFT_BLACK);
   // Placé juste au-dessus de la rangée de boutons (y=180)
-  tft.drawString(lastActionText, 10, 160);
+  tft.drawString(lastActionText, 10, 176);
 
   // Boutons d'action
   for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
