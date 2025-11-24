@@ -48,8 +48,9 @@ enum AppState {
 
 AppState appState = STATE_TITLE;
 
+// Vue actuelle en jeu
 enum GameView {
-  VIEW_MAIN = 0,
+  VIEW_MAIN,
   VIEW_STATS
 };
 
@@ -225,6 +226,30 @@ void drawNeedRow(const char* label, float value, int16_t x, int16_t y) {
   char buffer[40];
   snprintf(buffer, sizeof(buffer), "%s: %.0f%%", label, value * 100.0f);
   tft.drawString(buffer, x, y);
+}
+
+void drawGaugeRow(const char* label, float value, int16_t x, int16_t y) {
+  const int segments = 10;
+  char gauge[segments + 3]; // '[' + 10 segments + ']' + '\0'
+
+  gauge[0] = '[';
+  for (int i = 0; i < segments; ++i) {
+    gauge[i + 1] = (i < value * segments) ? '#' : '-';
+  }
+  gauge[segments + 1] = ']';
+  gauge[segments + 2] = '\0';
+
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "%s: %s", label, gauge);
+
+  tft.drawString(buffer, x, y);
+
+  // Positionne le pourcentage apres la jauge en supposant la police 2 (~6 px par caractere)
+  char percent[8];
+  snprintf(percent, sizeof(percent), "%3d%%", static_cast<int>(value * 100.0f + 0.5f));
+
+  int16_t percentX = x + 70 + (segments + 2) * 6 + 8;
+  tft.drawString(percent, percentX, y);
 }
 
 void drawPetFace() {
@@ -419,65 +444,6 @@ void drawGameScreenStatic() {
   tft.fillRect(ALERT_AREA_X, ALERT_AREA_Y, ALERT_AREA_W, ALERT_AREA_H, HUD_BAND_COLOR);
 }
 
-void drawGameScreenDynamic() {
-  static Pet cachedPet = {};
-  static bool drawInitialized = false;
-  static char cachedAction[sizeof(lastActionText)] = "";
-  static bool cachedActionAuto = false;
-  static GameView cachedView = VIEW_MAIN;
-
-  auto valueChanged = [](float a, float b, float epsilon) {
-    return fabsf(a - b) >= epsilon;
-  };
-
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextFont(2);
-
-  bool headerDirty = !drawInitialized || strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
-                     cachedPet.personality != currentPet.personality || cachedPet.lifeStage != currentPet.lifeStage ||
-                     valueChanged(cachedPet.age, currentPet.age, 0.05f);
-  bool needsDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.01f) ||
-                    valueChanged(cachedPet.hunger, currentPet.hunger, 0.01f) ||
-                    valueChanged(cachedPet.energy, currentPet.energy, 0.01f) ||
-                    valueChanged(cachedPet.social, currentPet.social, 0.01f) ||
-                    valueChanged(cachedPet.cleanliness, currentPet.cleanliness, 0.01f) ||
-                    valueChanged(cachedPet.curiosity, currentPet.curiosity, 0.01f);
-  bool faceDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.02f);
-  bool actionDirty = !drawInitialized || cachedActionAuto != lastActionIsAuto ||
-                     strncmp(cachedAction, lastActionText, sizeof(lastActionText)) != 0;
-  bool viewChanged = !drawInitialized || cachedView != currentGameView;
-
-  bool alertDirty = !drawInitialized || needsDirty || viewChanged;
-
-  if (currentGameView == VIEW_MAIN) {
-    drawGameViewMain(headerDirty || viewChanged, needsDirty || viewChanged, faceDirty || viewChanged);
-  } else {
-    bool statsDirty = viewChanged || headerDirty || needsDirty;
-    drawGameViewStats(statsDirty);
-  }
-
-  if (actionDirty || viewChanged) {
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextFont(2);
-    uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
-    tft.setTextColor(color, TFT_BLACK);
-    tft.fillRect(0, ACTION_AREA_Y, SCREEN_W, ACTION_AREA_HEIGHT, TFT_BLACK);
-    // Placé juste au-dessus de la rangée de boutons bas
-    tft.drawString(lastActionText, 10, ACTION_AREA_Y + 6);
-  }
-
-  if (alertDirty) {
-    drawAlertIcon();
-  }
-
-  cachedPet = currentPet;
-  drawInitialized = true;
-  cachedView = currentGameView;
-  strncpy(cachedAction, lastActionText, sizeof(cachedAction));
-  cachedAction[sizeof(cachedAction) - 1] = '\0';
-  cachedActionAuto = lastActionIsAuto;
-}
-
 void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty) {
   const int16_t headerY = TOP_MENU_HEIGHT + 4;
   const int16_t headerH = 52;
@@ -518,86 +484,112 @@ void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty) {
   }
 }
 
-void drawGaugeRow(const char* label, float value01, int16_t x, int16_t y) {
-  const int segments = 10;
-  if (value01 < 0.0f) value01 = 0.0f;
-  if (value01 > 1.0f) value01 = 1.0f;
-
-  int filled = static_cast<int>(roundf(value01 * segments));
-  if (filled > segments) filled = segments;
-
-  char gauge[segments + 3];
-  gauge[0] = '[';
-  for (int i = 0; i < segments; ++i) {
-    gauge[i + 1] = (i < filled) ? '#' : '-';
-  }
-  gauge[segments + 1] = ']';
-  gauge[segments + 2] = '\0';
-
-  char percent[8];
-  int pct = static_cast<int>(roundf(value01 * 100.0f));
-  if (pct < 0) pct = 0;
-  if (pct > 100) pct = 100;
-  snprintf(percent, sizeof(percent), "%d%%", pct);
-
-  tft.drawString(label, x, y);
-  tft.drawString(gauge, x + 70, y);
-  int16_t percentX = x + 70 + (segments + 2) * 6 + 8;
-  tft.drawString(percent, percentX, y);
-}
-
 void drawGameViewStats(bool statsDirty) {
   if (!statsDirty) return;
-
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextFont(2);
 
   const int16_t contentY = TOP_MENU_HEIGHT;
   const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
   tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const int16_t headerY = contentY + 4;
-
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 4);
-  tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, headerY + 18);
+  tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 6);
   tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-  tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, headerY + 32);
+  tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, headerY + 20);
   tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
-  tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, headerY + 46);
+  tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, headerY + 34);
 
-  int16_t tableY = headerY + 64;
-  uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
-  tft.setTextColor(moodColor, TFT_BLACK);
-  drawGaugeRow("Mood", currentPet.mood, 10, tableY);
-
-  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  drawGaugeRow("Hunger", currentPet.hunger, 10, tableY + 16);
-  drawGaugeRow("Energy", currentPet.energy, 10, tableY + 32);
-  drawGaugeRow("Social", currentPet.social, 10, tableY + 48);
-  drawGaugeRow("Clean", currentPet.cleanliness, 10, tableY + 64);
-  drawGaugeRow("Curio", currentPet.curiosity, 10, tableY + 80);
-
-  float needs[] = { currentPet.hunger, currentPet.energy, currentPet.social, currentPet.cleanliness, currentPet.curiosity };
   const char* hints[] = {
-    "Hint: pet is hungry.",
-    "Hint: pet needs rest.",
-    "Hint: pet wants to play.",
-    "Hint: pet needs a wash.",
-    "Hint: pet wants discovery."
+    "Indice: ton pet a faim.",
+    "Indice: ton pet a besoin de repos.",
+    "Indice: ton pet veut jouer.",
+    "Indice: ton pet a besoin d une toilette.",
+    "Indice: ton pet veut explorer."
   };
 
-  int lowestIdx = 0;
-  float lowestNeed = needs[0];
-  for (int i = 1; i < 5; ++i) {
-    if (needs[i] < lowestNeed) {
-      lowestNeed = needs[i];
-      lowestIdx = i;
+  float needs[] = { currentPet.hunger, currentPet.energy, currentPet.social, currentPet.cleanliness, currentPet.curiosity };
+  size_t minIndex = 0;
+  float minNeed = needs[0];
+  for (size_t i = 1; i < 5; ++i) {
+    if (needs[i] < minNeed) {
+      minNeed = needs[i];
+      minIndex = i;
     }
   }
 
-  tft.setTextColor(TFT_SKYBLUE, TFT_BLACK);
-  tft.drawString(hints[lowestIdx], 10, ACTION_AREA_Y - 18);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.drawString(hints[minIndex], 10, headerY + 48);
+
+  int16_t tableY = headerY + 64;
+  int16_t available = (ACTION_AREA_Y - 8) - tableY;
+  const int rows = 6;
+  int16_t rowHeight = available / rows;
+
+  drawGaugeRow("Mood",   currentPet.mood,         10, tableY + rowHeight * 0);
+  drawGaugeRow("Hunger", currentPet.hunger,       10, tableY + rowHeight * 1);
+  drawGaugeRow("Energy", currentPet.energy,       10, tableY + rowHeight * 2);
+  drawGaugeRow("Social", currentPet.social,       10, tableY + rowHeight * 3);
+  drawGaugeRow("Clean",  currentPet.cleanliness,  10, tableY + rowHeight * 4);
+  drawGaugeRow("Curio",  currentPet.curiosity,    10, tableY + rowHeight * 5);
+}
+
+void drawGameScreenDynamic() {
+  static Pet cachedPet = {};
+  static bool drawInitialized = false;
+  static char cachedAction[sizeof(lastActionText)] = "";
+  static bool cachedActionAuto = false;
+  static GameView cachedView = VIEW_MAIN;
+
+  auto valueChanged = [](float a, float b, float epsilon) {
+    return fabsf(a - b) >= epsilon;
+  };
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(2);
+
+  bool headerDirty = !drawInitialized || strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
+                     cachedPet.personality != currentPet.personality || cachedPet.lifeStage != currentPet.lifeStage ||
+                     valueChanged(cachedPet.age, currentPet.age, 0.05f);
+  bool needsDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.01f) ||
+                    valueChanged(cachedPet.hunger, currentPet.hunger, 0.01f) ||
+                    valueChanged(cachedPet.energy, currentPet.energy, 0.01f) ||
+                    valueChanged(cachedPet.social, currentPet.social, 0.01f) ||
+                    valueChanged(cachedPet.cleanliness, currentPet.cleanliness, 0.01f) ||
+                    valueChanged(cachedPet.curiosity, currentPet.curiosity, 0.01f);
+  bool faceDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.02f);
+  bool actionDirty = !drawInitialized || cachedActionAuto != lastActionIsAuto ||
+                     strncmp(cachedAction, lastActionText, sizeof(lastActionText)) != 0;
+
+  bool viewChanged = !drawInitialized || cachedView != currentGameView;
+  bool alertDirty = !drawInitialized || needsDirty || viewChanged;
+
+  if (currentGameView == VIEW_MAIN) {
+    drawGameViewMain(headerDirty || viewChanged, needsDirty || viewChanged, faceDirty || viewChanged);
+  } else {
+    bool statsDirty = headerDirty || needsDirty || faceDirty || viewChanged;
+    drawGameViewStats(statsDirty);
+  }
+
+  if (actionDirty || viewChanged) {
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(2);
+    uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
+    tft.setTextColor(color, TFT_BLACK);
+    tft.fillRect(0, ACTION_AREA_Y, SCREEN_W, ACTION_AREA_HEIGHT, TFT_BLACK);
+    // Placé juste au-dessus de la rangée de boutons bas
+    tft.drawString(lastActionText, 10, ACTION_AREA_Y + 6);
+  }
+
+  if (alertDirty) {
+    drawAlertIcon();
+  }
+
+  cachedPet = currentPet;
+  drawInitialized = true;
+  cachedView = currentGameView;
+  strncpy(cachedAction, lastActionText, sizeof(cachedAction));
+  cachedAction[sizeof(cachedAction) - 1] = '\0';
+  cachedActionAuto = lastActionIsAuto;
 }
 
 void drawAlertIcon() {
@@ -796,13 +788,8 @@ void actionDuel() {
 }
 
 void actionShowStats() {
-  if (currentGameView == VIEW_MAIN) {
-    currentGameView = VIEW_STATS;
-    setLastAction("Stats detaillees", false);
-  } else {
-    currentGameView = VIEW_MAIN;
-    setLastAction("Retour a la vue jeu", false);
-  }
+  currentGameView = (currentGameView == VIEW_MAIN) ? VIEW_STATS : VIEW_MAIN;
+  setLastAction(currentGameView == VIEW_STATS ? "Affichage des stats" : "Retour a la vue principale", false);
   drawGameScreenDynamic();
 }
 
