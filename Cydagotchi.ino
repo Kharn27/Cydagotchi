@@ -140,31 +140,25 @@ const PersonalityModifiers PERSONALITY_MODIFIERS[PERSO_COUNT] = {
   { "Maniaque", 1.0f, 1.0f, 1.0f, 1.4f, 1.0f }
 };
 
-const PersonalityModifiers& getPersonalityModifiers(const Pet& pet) {
-  return PERSONALITY_MODIFIERS[pet.personality];
-}
-
-const char* getPersonalityLabel(const Pet& pet) {
-  return getPersonalityModifiers(pet).label;
-}
-
 void updateMood() {
   float sum = currentPet.hunger + currentPet.energy + currentPet.social + currentPet.cleanliness + currentPet.curiosity;
   currentPet.mood = clamp01(sum / 5.0f);
 }
 
 void updateNeeds(float dtSeconds) {
-  const PersonalityModifiers& mods = getPersonalityModifiers(currentPet);
+  const PersonalityModifiers& mods = PERSONALITY_MODIFIERS[currentPet.personality];
 
   currentPet.hunger      = clamp01(currentPet.hunger - 0.01f  * mods.hungerMul * dtSeconds);
   currentPet.energy      = clamp01(currentPet.energy - 0.008f * mods.energyMul * dtSeconds);
   currentPet.social      = clamp01(currentPet.social - 0.005f * mods.socialMul * dtSeconds);
   currentPet.cleanliness = clamp01(currentPet.cleanliness - 0.004f * mods.cleanMul  * dtSeconds);
   currentPet.curiosity   = clamp01(currentPet.curiosity + 0.003f * mods.curioMul * dtSeconds);
-  currentPet.age        += dtSeconds / 60.0f;  // 1 minute réelle = 1 jour virtuel
+  currentPet.age        += dtSeconds / 60.0f;
 
   updateMood();
 }
+
+
 
 void initDefaultPet() {
   strncpy(currentPet.name, "Cydy", sizeof(currentPet.name));
@@ -180,7 +174,7 @@ void initDefaultPet() {
   petInitialized = true;
   setLastAction("Nouveau pet cree", false);
   Serial.print("Personnalite : ");
-  Serial.println(getPersonalityLabel(currentPet));
+  Serial.println(PERSONALITY_MODIFIERS[currentPet.personality].label);
 }
 
 void addNeed(float &need, float delta) {
@@ -372,7 +366,8 @@ void drawGameScreen() {
   tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
   tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
   tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-  tft.drawString(String("Caractere: ") + getPersonalityLabel(currentPet), 10, 44);
+  tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
+
 
   uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
   tft.setTextColor(moodColor, TFT_BLACK);
