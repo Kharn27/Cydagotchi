@@ -42,6 +42,14 @@ bool lastActionIsAuto = false;
 PersonalityType newPetPersonality = PERSO_EQUILIBRE;
 bool hasNewPetPersonality = false;
 
+// Sélection de nom pour l'écran NEW_PET
+const char* PRESET_NAMES[] = { "Cydy", "Bytey", "Pixy", "Nibbles", "Nova", "Gizmo" };
+const size_t PRESET_NAME_COUNT = sizeof(PRESET_NAMES) / sizeof(PRESET_NAMES[0]);
+
+char newPetName[16] = "Cydy";
+uint8_t newPetNameIndex = 0;
+bool hasNewPetName = false;
+
 // --- Définition de boutons enrichis ---
 typedef void (*ButtonAction)();
 
@@ -64,6 +72,8 @@ void actionPlay();
 void actionWash();
 void actionPrevPersonality();
 void actionNextPersonality();
+void actionPrevName();
+void actionNextName();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
@@ -72,9 +82,16 @@ Button menuButtons[] = {
 };
 
 Button newPetButtons[] = {
-  { 40, 150, 50, 30, "<",  TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionPrevPersonality },
-  { 230, 150, 50, 30, ">", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionNextPersonality },
-  { 70, 190, 180, 40, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
+  // Personnalité
+  { 40, 140, 50, 30, "<P",  TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionPrevPersonality },
+  { 230, 140, 50, 30, "P>", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionNextPersonality },
+
+  // Nom
+  { 40, 175, 50, 30, "<N",  TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionPrevName },
+  { 230, 175, 50, 30, "N>", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionNextName },
+
+  // Démarrer le jeu
+  { 70, 210, 180, 30, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
 };
 
 Button gameButtons[] = {
@@ -176,12 +193,21 @@ void changeScene(AppState next) {
         newPetPersonality = PERSO_EQUILIBRE;
         hasNewPetPersonality = true;
       }
+
+      if (!hasNewPetName) {
+        newPetNameIndex = 0;
+        strncpy(newPetName, PRESET_NAMES[newPetNameIndex], sizeof(newPetName));
+        newPetName[sizeof(newPetName) - 1] = '\0';
+        hasNewPetName = true;
+      }
       drawNewPetScreen();
       break;
     case STATE_GAME:
       if (!petInitialized) {
-        if (hasNewPetPersonality) {
-          initPetWithPersonality(newPetPersonality);
+        if (hasNewPetPersonality && hasNewPetName) {
+          initPetWithPersonality(newPetPersonality, newPetName);
+        } else if (hasNewPetPersonality) {
+          initPetWithPersonality(newPetPersonality, "Cydy");
         } else {
           initDefaultPet();
         }
@@ -273,7 +299,8 @@ void drawNewPetScreen() {
   tft.drawString("Nouveau Pet", SCREEN_W / 2, 40);
 
   tft.setTextFont(2);
-  tft.drawString("Nom par defaut : Cydy", SCREEN_W / 2, 100);
+  String nameLine = String("Nom : ") + newPetName;
+  tft.drawString(nameLine, SCREEN_W / 2, 100);
 
   String persoLine = String("Personnalite : ") +
                      PERSONALITY_MODIFIERS[newPetPersonality].label;
@@ -432,6 +459,7 @@ void actionStartNewPet() {
 void actionLoadPet() {
   Serial.println("Load Pet selected");
   hasNewPetPersonality = false;
+  hasNewPetName = false;
   petInitialized = false;
   // En attendant le module de chargement, on entre en jeu directement
   changeScene(STATE_GAME);
@@ -456,6 +484,27 @@ void actionPrevPersonality() {
 
 void actionNextPersonality() {
   newPetPersonality = static_cast<PersonalityType>((newPetPersonality + 1) % PERSO_COUNT);
+  drawNewPetScreen();
+}
+
+static void copyCurrentPresetName() {
+  strncpy(newPetName, PRESET_NAMES[newPetNameIndex], sizeof(newPetName));
+  newPetName[sizeof(newPetName) - 1] = '\0';
+}
+
+void actionPrevName() {
+  if (newPetNameIndex == 0) {
+    newPetNameIndex = PRESET_NAME_COUNT - 1;
+  } else {
+    newPetNameIndex--;
+  }
+  copyCurrentPresetName();
+  drawNewPetScreen();
+}
+
+void actionNextName() {
+  newPetNameIndex = (newPetNameIndex + 1) % PRESET_NAME_COUNT;
+  copyCurrentPresetName();
   drawNewPetScreen();
 }
 
