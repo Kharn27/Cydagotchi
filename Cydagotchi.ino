@@ -7,6 +7,7 @@
 
 #include "PetModel.h"
 #include "PetLogic.h"
+#include "PetStorage.h"
 
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
@@ -108,9 +109,11 @@ const size_t GAME_BUTTON_COUNT   = sizeof(gameButtons) / sizeof(gameButtons[0]);
 const unsigned long GAME_TICK_INTERVAL_MS = 400;
 const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
 const unsigned long GAME_REDRAW_INTERVAL_MS = 1000;
+const unsigned long AUTO_SAVE_INTERVAL_MS = 30000;
 unsigned long lastGameTickMillis = 0;
 unsigned long lastAutoActionMillis = 0;
 unsigned long lastRedrawMillis = 0;
+unsigned long lastAutoSaveMillis = 0;
 
 void setLastAction(const char* text, bool isAuto) {
   strncpy(lastActionText, text, sizeof(lastActionText));
@@ -216,6 +219,7 @@ void changeScene(AppState next) {
       lastGameTickMillis = millis();
       lastAutoActionMillis = lastGameTickMillis;
       lastRedrawMillis = lastGameTickMillis;
+      lastAutoSaveMillis = lastGameTickMillis;
       drawGameScreen();
       break;
   }
@@ -353,6 +357,9 @@ void drawGameScreen() {
 void setup() {
   Serial.begin(115200);
 
+  // Initialisation du stockage
+  petStorageBegin();
+
   // Seed RNG pour varier la personnalité et les stats de départ
   randomSeed(analogRead(34));
 
@@ -413,6 +420,11 @@ void loop() {
           lastAutoActionMillis = now;
         }
 
+        if (now - lastAutoSaveMillis >= AUTO_SAVE_INTERVAL_MS) {
+          petSaveToStorage();
+          lastAutoSaveMillis = now;
+        }
+
         if (now - lastRedrawMillis >= GAME_REDRAW_INTERVAL_MS) {
           drawGameScreen();
           lastRedrawMillis = now;
@@ -426,6 +438,7 @@ void actionEat() {
   petApplyEat();
   lastAutoActionMillis = millis();             // reset du timer auto
   setLastAction("Tu lui donnes à manger", false);
+  petSaveToStorage();
   drawGameScreen();
 }
 
@@ -433,6 +446,7 @@ void actionSleep() {
   petApplySleep();
   lastAutoActionMillis = millis();
   setLastAction("Tu le mets au dodo", false);
+  petSaveToStorage();
   drawGameScreen();
 }
 
@@ -440,6 +454,7 @@ void actionPlay() {
   petApplyPlay();
   lastAutoActionMillis = millis();
   setLastAction("Tu joues avec lui", false);
+  petSaveToStorage();
   drawGameScreen();
 }
 
@@ -447,6 +462,7 @@ void actionWash() {
   petApplyWash();
   lastAutoActionMillis = millis();
   setLastAction("Tu le laves", false);
+  petSaveToStorage();
   drawGameScreen();
 }
 
@@ -460,8 +476,14 @@ void actionLoadPet() {
   Serial.println("Load Pet selected");
   hasNewPetPersonality = false;
   hasNewPetName = false;
-  petInitialized = false;
-  // En attendant le module de chargement, on entre en jeu directement
+  bool loaded = petLoadFromStorage();
+  if (!loaded) {
+    petInitialized = false; // pour forcer la création en STATE_GAME
+    setLastAction("Pas de sauvegarde, nouveau pet", false);
+  } else {
+    setLastAction("Pet charge depuis la sauvegarde", false);
+  }
+  // On entre en jeu directement
   changeScene(STATE_GAME);
 }
 
