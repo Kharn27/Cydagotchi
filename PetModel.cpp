@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "PetModel.h"
-#include <cstring>   // ou <string.h>
+#include <cstring>
 
 Pet currentPet;
 bool petInitialized = false;
