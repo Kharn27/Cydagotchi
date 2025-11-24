@@ -12,6 +12,8 @@
 #include "UiScreens.h"
 #include "Input.h"
 #include "Actions.h"
+#include "GameState.h"
+#include "GameLoop.h"
 
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
@@ -24,9 +26,6 @@ TFT_eSPI tft = TFT_eSPI();
 // SPI séparé pour le tactile
 SPIClass touchscreenSPI = SPIClass(VSPI);
 XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
-
-AppState appState = STATE_TITLE;
-GameView currentGameView = VIEW_MAIN;
 
 // Journal d'action (dernière action effectuée) dans Actions.cpp
 // Sélection de personnalité et nom pour NEW_PET dans Actions.cpp
@@ -68,15 +67,6 @@ extern const size_t MENU_BUTTON_COUNT      = sizeof(menuButtons) / sizeof(menuBu
 extern const size_t NEWPET_BUTTON_COUNT    = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
 extern const size_t TOPMENU_BUTTON_COUNT   = sizeof(topMenuButtons) / sizeof(topMenuButtons[0]);
 extern const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
-
-const unsigned long GAME_TICK_INTERVAL_MS = 400;
-const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
-const unsigned long GAME_REDRAW_INTERVAL_MS = 1000;
-const unsigned long AUTO_SAVE_INTERVAL_MS = 30000;
-unsigned long lastGameTickMillis = 0;
-unsigned long lastAutoActionMillis = 0;
-unsigned long lastRedrawMillis = 0;
-unsigned long lastAutoSaveMillis = 0;
 
 void changeScene(AppState next) {
   appState = next;
@@ -168,39 +158,7 @@ void loop() {
       break;
 
     case STATE_GAME:
-      if (!processTouchForButtons(topMenuButtons, TOPMENU_BUTTON_COUNT)) {
-        processTouchForButtons(bottomMenuButtons, BOTTOMMENU_BUTTON_COUNT);
-      }
-      {
-        unsigned long now = millis();
-        unsigned long elapsed = now - lastGameTickMillis;
-        if (elapsed >= GAME_TICK_INTERVAL_MS) {
-          float dtSeconds = static_cast<float>(elapsed) / 1000.0f;
-          lastGameTickMillis = now;
-          updateNeeds(dtSeconds);
-          if (petLifeStageJustChanged()) {
-            setLastAction(getLifeStageChangeMessage(getLastLifeStageForEvents(), currentPet.lifeStage), false);
-            applyLifeStageChangeEffects(currentPet.lifeStage);
-            drawGameScreenDynamic();
-            clearLifeStageChangedFlag();
-          }
-        }
-
-        if (now - lastAutoActionMillis >= AUTO_ACTION_INTERVAL_MS) {
-          chooseAndApplyAutoAction();
-          lastAutoActionMillis = now;
-        }
-
-        if (now - lastAutoSaveMillis >= AUTO_SAVE_INTERVAL_MS) {
-          petSaveToStorage();
-          lastAutoSaveMillis = now;
-        }
-
-        if (now - lastRedrawMillis >= GAME_REDRAW_INTERVAL_MS) {
-          drawGameScreenDynamic();
-          lastRedrawMillis = now;
-        }
-      }
+      gameLoopTick();
       break;
   }
 }

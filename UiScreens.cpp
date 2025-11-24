@@ -2,9 +2,8 @@
 #include <cstring>
 #include <cmath>
 #include "UiScreens.h"
-
-extern Pet currentPet;
-extern GameView currentGameView;
+#include "Actions.h"
+#include "GameState.h"
 
 extern Button menuButtons[];
 extern Button newPetButtons[];

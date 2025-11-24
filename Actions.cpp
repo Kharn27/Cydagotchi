@@ -2,11 +2,10 @@
 #include <cstring>
 #include "Actions.h"
 #include "UiScreens.h"
+#include "GameState.h"
 
 extern Pet currentPet;
 extern bool petInitialized;
-extern GameView currentGameView;
-extern unsigned long lastAutoActionMillis;
 
 void changeScene(AppState next);
 
