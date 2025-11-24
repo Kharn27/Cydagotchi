@@ -82,8 +82,10 @@ const size_t GAME_BUTTON_COUNT   = sizeof(gameButtons) / sizeof(gameButtons[0]);
 
 const unsigned long GAME_TICK_INTERVAL_MS = 400;
 const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
+const unsigned long GAME_REDRAW_INTERVAL_MS = 1000;
 unsigned long lastGameTickMillis = 0;
 unsigned long lastAutoActionMillis = 0;
+unsigned long lastRedrawMillis = 0;
 
 void setLastAction(const char* text, bool isAuto) {
   strncpy(lastActionText, text, sizeof(lastActionText));
@@ -171,6 +173,7 @@ void changeScene(AppState next) {
       }
       lastGameTickMillis = millis();
       lastAutoActionMillis = lastGameTickMillis;
+      lastRedrawMillis = lastGameTickMillis;
       drawGameScreen();
       break;
   }
@@ -347,7 +350,7 @@ void loop() {
 
     case STATE_GAME:
       processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
-      {          
+      {
         unsigned long now = millis();
         unsigned long elapsed = now - lastGameTickMillis;
         if (elapsed >= GAME_TICK_INTERVAL_MS) {
@@ -361,6 +364,11 @@ void loop() {
         if (now - lastAutoActionMillis >= AUTO_ACTION_INTERVAL_MS) {
           chooseAndApplyAutoAction();   // cette fonction appelle déjà drawGameScreen()
           lastAutoActionMillis = now;
+        }
+
+        if (now - lastRedrawMillis >= GAME_REDRAW_INTERVAL_MS) {
+          drawGameScreen();
+          lastRedrawMillis = now;
         }
       }
       break;
