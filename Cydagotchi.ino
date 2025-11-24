@@ -25,6 +25,18 @@ XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);   // inchangé
 
 const int16_t SCREEN_W = 320;
 const int16_t SCREEN_H = 240;
+const int16_t TOP_MENU_HEIGHT = 32;
+const int16_t BOTTOM_MENU_HEIGHT = 40;
+const int16_t ALERT_AREA_W = 64;
+const int16_t ALERT_AREA_H = BOTTOM_MENU_HEIGHT;
+const int16_t ALERT_AREA_X = SCREEN_W - ALERT_AREA_W;
+const int16_t ALERT_AREA_Y = SCREEN_H - BOTTOM_MENU_HEIGHT;
+const uint16_t HUD_BAND_COLOR = TFT_DARKGREY;
+const uint16_t HUD_TEXT_COLOR = TFT_WHITE;
+const uint16_t HUD_BORDER_COLOR = TFT_WHITE;
+
+const int16_t ACTION_AREA_HEIGHT = 28;
+const int16_t ACTION_AREA_Y = SCREEN_H - BOTTOM_MENU_HEIGHT - ACTION_AREA_HEIGHT;
 
 // --- États du programme ---
 enum AppState {
@@ -39,6 +51,7 @@ AppState appState = STATE_TITLE;
 // Journal d'action (dernière action effectuée)
 char lastActionText[32] = "Bienvenue !";
 bool lastActionIsAuto = false;
+bool lightsOff = false;
 
 // Sélection de personnalité pour l'écran NEW_PET
 PersonalityType newPetPersonality = PERSO_EQUILIBRE;
@@ -72,6 +85,10 @@ void actionEat();
 void actionSleep();
 void actionPlay();
 void actionWash();
+void actionToggleLights();
+void actionDuel();
+void actionShowStats();
+void actionStubWorld();
 void actionPrevPersonality();
 void actionNextPersonality();
 void actionPrevName();
@@ -93,19 +110,26 @@ Button newPetButtons[] = {
   { 230, 175, 50, 30, "N>", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionNextName },
 
   // Démarrer le jeu
-  { 70, 210, 180, 30, "Démarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
+  { 70, 210, 180, 30, "Demarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
+};
+Button topMenuButtons[] = {
+  { 0, 0, SCREEN_W / 4, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats },
+  { SCREEN_W / 4, 0, SCREEN_W / 4, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionEat },
+  { (SCREEN_W / 4) * 2, 0, SCREEN_W / 4, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionPlay },
+  { (SCREEN_W / 4) * 3, 0, SCREEN_W / 4, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionStubWorld }
 };
 
-Button gameButtons[] = {
-  { 20, 180, 70, 40, "Mange", TFT_DARKGREEN, TFT_WHITE, TFT_WHITE, actionEat },
-  { 95, 180, 70, 40, "Dors", TFT_DARKGREY, TFT_WHITE, TFT_WHITE, actionSleep },
-  { 170, 180, 70, 40, "Joue", TFT_BLUE, TFT_WHITE, TFT_WHITE, actionPlay },
-  { 245, 180, 70, 40, "Lave", TFT_CYAN, TFT_BLACK, TFT_WHITE, actionWash }
+const int16_t bottomButtonWidth = (SCREEN_W - ALERT_AREA_W) / 3;
+Button bottomMenuButtons[] = {
+  { 0, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Lumiere", TFT_DARKGREY, TFT_WHITE, HUD_BORDER_COLOR, actionToggleLights },
+  { bottomButtonWidth, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Toilette", TFT_CYAN, TFT_BLACK, HUD_BORDER_COLOR, actionWash },
+  { bottomButtonWidth * 2, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Duel", TFT_RED, TFT_WHITE, HUD_BORDER_COLOR, actionDuel }
 };
 
-const size_t MENU_BUTTON_COUNT   = sizeof(menuButtons) / sizeof(menuButtons[0]);
-const size_t NEWPET_BUTTON_COUNT = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
-const size_t GAME_BUTTON_COUNT   = sizeof(gameButtons) / sizeof(gameButtons[0]);
+const size_t MENU_BUTTON_COUNT      = sizeof(menuButtons) / sizeof(menuButtons[0]);
+const size_t NEWPET_BUTTON_COUNT    = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
+const size_t TOPMENU_BUTTON_COUNT   = sizeof(topMenuButtons) / sizeof(topMenuButtons[0]);
+const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
 
 const unsigned long GAME_TICK_INTERVAL_MS = 400;
 const unsigned long AUTO_ACTION_INTERVAL_MS = 6000;
@@ -223,6 +247,7 @@ void drawNewPetScreen();
 void drawGameScreen();
 void drawGameScreenStatic();
 void drawGameScreenDynamic();
+void drawAlertIcon();
 void chooseAndApplyAutoAction();
 
 // --- Gestion centralisée des scènes ---
@@ -315,11 +340,10 @@ bool processTouchForButtons(Button* buttons, size_t count) {
     }
   }
 
-  // Debounce + attendre relâchement
-  delay(150);
-  while (ts.touched()) {}
-
   if (actionToFire) {
+    // Debounce + attendre relâchement
+    delay(150);
+    while (ts.touched()) {}
     actionToFire();
     return true;
   }
@@ -368,10 +392,20 @@ void drawGameScreenStatic() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  // Boutons d'action
-  for (size_t i = 0; i < GAME_BUTTON_COUNT; ++i) {
-    drawButton(gameButtons[i]);
+  // Bandeau haut
+  tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
+  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
+    drawButton(topMenuButtons[i]);
   }
+
+  // Bandeau bas
+  tft.fillRect(0, ALERT_AREA_Y, SCREEN_W, BOTTOM_MENU_HEIGHT, HUD_BAND_COLOR);
+  for (size_t i = 0; i < BOTTOMMENU_BUTTON_COUNT; ++i) {
+    drawButton(bottomMenuButtons[i]);
+  }
+
+  // Zone alerte réservée
+  tft.fillRect(ALERT_AREA_X, ALERT_AREA_Y, ALERT_AREA_W, ALERT_AREA_H, HUD_BAND_COLOR);
 }
 
 void drawGameScreenDynamic() {
@@ -400,33 +434,39 @@ void drawGameScreenDynamic() {
   bool actionDirty = !drawInitialized || cachedActionAuto != lastActionIsAuto ||
                      strncmp(cachedAction, lastActionText, sizeof(lastActionText)) != 0;
 
+  bool alertDirty = !drawInitialized || needsDirty;
+  const int16_t headerY = TOP_MENU_HEIGHT + 4;
+  const int16_t headerH = 52;
+  const int16_t needsY = headerY + headerH + 4;
+  const int16_t needsH = ACTION_AREA_Y - needsY - 4;
+
   if (headerDirty) {
-    tft.fillRect(0, 0, 210, 70, TFT_BLACK);
+    tft.fillRect(0, headerY, 210, headerH, TFT_BLACK);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tft.drawString(String("Nom: ") + currentPet.name, 10, 10);
-    tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, 28);
+    tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 6);
+    tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, headerY + 20);
     tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-    tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, 44);
+    tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, headerY + 32);
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
-    tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, 60);
+    tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, headerY + 46);
   }
 
   if (needsDirty) {
-    tft.fillRect(0, 70, 210, 100, TFT_BLACK);
+    tft.fillRect(0, needsY, 210, needsH, TFT_BLACK);
     uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
     tft.setTextColor(moodColor, TFT_BLACK);
-    drawNeedRow("Humeur", currentPet.mood, 10, 76);
+    drawNeedRow("Humeur", currentPet.mood, 10, needsY + 6);
 
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    drawNeedRow("Hunger", currentPet.hunger, 10, 96);
-    drawNeedRow("Energy", currentPet.energy, 10, 112);
-    drawNeedRow("Social", currentPet.social, 10, 128);
-    drawNeedRow("Clean", currentPet.cleanliness, 10, 144);
-    drawNeedRow("Curio", currentPet.curiosity, 10, 160);
+    drawNeedRow("Hunger", currentPet.hunger, 10, needsY + 18);
+    drawNeedRow("Energy", currentPet.energy, 10, needsY + 30);
+    drawNeedRow("Social", currentPet.social, 10, needsY + 42);
+    drawNeedRow("Clean", currentPet.cleanliness, 10, needsY + 54);
+    drawNeedRow("Curio", currentPet.curiosity, 10, needsY + 62);
   }
 
   if (faceDirty) {
-    tft.fillRect(SCREEN_W - 120, 40, 100, 60, TFT_BLACK);
+    tft.fillRect(SCREEN_W - 120, headerY, 100, 80, TFT_BLACK);
     drawPetFace();
   }
 
@@ -435,16 +475,77 @@ void drawGameScreenDynamic() {
     tft.setTextFont(2);
     uint16_t color = lastActionIsAuto ? TFT_CYAN : TFT_ORANGE;
     tft.setTextColor(color, TFT_BLACK);
-    tft.fillRect(0, 170, SCREEN_W, 30, TFT_BLACK);
-    // Placé juste au-dessus de la rangée de boutons (y=180)
-    tft.drawString(lastActionText, 10, 176);
+    tft.fillRect(0, ACTION_AREA_Y, SCREEN_W, ACTION_AREA_HEIGHT, TFT_BLACK);
+    // Placé juste au-dessus de la rangée de boutons bas
+    tft.drawString(lastActionText, 10, ACTION_AREA_Y + 6);
     strncpy(cachedAction, lastActionText, sizeof(cachedAction));
     cachedAction[sizeof(cachedAction) - 1] = '\0';
     cachedActionAuto = lastActionIsAuto;
   }
 
+  if (alertDirty) {
+    drawAlertIcon();
+  }
+
   cachedPet = currentPet;
   drawInitialized = true;
+}
+
+void drawAlertIcon() {
+  float needs[] = { currentPet.hunger, currentPet.energy, currentPet.social, currentPet.cleanliness, currentPet.curiosity };
+  enum AlertType { ALERT_HUNGER = 0, ALERT_ENERGY, ALERT_SOCIAL, ALERT_CLEAN, ALERT_CURIO };
+  AlertType alertType = ALERT_HUNGER;
+
+  float minNeed = needs[0];
+  for (size_t i = 1; i < 5; ++i) {
+    if (needs[i] < minNeed) {
+      minNeed = needs[i];
+      alertType = static_cast<AlertType>(i);
+    }
+  }
+
+  tft.fillRect(ALERT_AREA_X, ALERT_AREA_Y, ALERT_AREA_W, ALERT_AREA_H, HUD_BAND_COLOR);
+
+  if (minNeed > 0.6f) {
+    return;
+  }
+
+  int16_t cx = ALERT_AREA_X + ALERT_AREA_W / 2;
+  int16_t cy = ALERT_AREA_Y + ALERT_AREA_H / 2;
+
+  switch (alertType) {
+    case ALERT_HUNGER:
+      tft.fillCircle(cx - 6, cy, 9, TFT_ORANGE);
+      tft.fillRect(cx + 2, cy - 3, 10, 6, TFT_ORANGE);
+      tft.fillCircle(cx + 12, cy - 3, 3, TFT_WHITE);
+      break;
+    case ALERT_ENERGY:
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextFont(2);
+      tft.setTextColor(TFT_YELLOW, HUD_BAND_COLOR);
+      tft.drawString("Zz", cx, cy);
+      break;
+    case ALERT_SOCIAL:
+      tft.fillCircle(cx - 10, cy, 6, TFT_CYAN);
+      tft.fillCircle(cx + 6, cy, 6, TFT_CYAN);
+      tft.fillCircle(cx - 14, cy - 6, 2, TFT_WHITE);
+      tft.fillCircle(cx + 2, cy - 6, 2, TFT_WHITE);
+      break;
+    case ALERT_CLEAN:
+      tft.fillCircle(cx - 6, cy - 4, 3, TFT_BLUE);
+      tft.fillCircle(cx + 2, cy + 2, 4, TFT_BLUE);
+      tft.fillCircle(cx + 10, cy - 3, 2, TFT_BLUE);
+      tft.setTextDatum(TL_DATUM);
+      tft.setTextColor(TFT_WHITE, HUD_BAND_COLOR);
+      tft.drawString("~", cx + 14, cy - 8);
+      break;
+    case ALERT_CURIO:
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextFont(2);
+      tft.setTextColor(TFT_WHITE, HUD_BAND_COLOR);
+      tft.drawString("?", cx, cy);
+      break;
+  }
 }
 
 void drawGameScreen() {
@@ -502,7 +603,9 @@ void loop() {
       break;
 
     case STATE_GAME:
-      processTouchForButtons(gameButtons, GAME_BUTTON_COUNT);
+      if (!processTouchForButtons(topMenuButtons, TOPMENU_BUTTON_COUNT)) {
+        processTouchForButtons(bottomMenuButtons, BOTTOMMENU_BUTTON_COUNT);
+      }
       {
         unsigned long now = millis();
         unsigned long elapsed = now - lastGameTickMillis;
@@ -542,7 +645,7 @@ void loop() {
 void actionEat() {
   petApplyEat();
   lastAutoActionMillis = millis();             // reset du timer auto
-  setLastAction("Tu lui donnes à manger", false);
+  setLastAction("Tu lui donnes a manger", false);
   petSaveToStorage();
   drawGameScreenDynamic();
 }
@@ -568,6 +671,28 @@ void actionWash() {
   lastAutoActionMillis = millis();
   setLastAction("Tu le laves", false);
   petSaveToStorage();
+  drawGameScreenDynamic();
+}
+
+void actionToggleLights() {
+  lightsOff = !lightsOff;
+  tft.invertDisplay(lightsOff);
+  setLastAction(lightsOff ? "Lumiere OFF" : "Lumiere ON", false);
+  drawGameScreenDynamic();
+}
+
+void actionDuel() {
+  setLastAction("Duel (WIP)", false);
+  drawGameScreenDynamic();
+}
+
+void actionShowStats() {
+  setLastAction("Affichage des stats (WIP)", false);
+  drawGameScreenDynamic();
+}
+
+void actionStubWorld() {
+  setLastAction("Monde / arene (WIP)", false);
   drawGameScreenDynamic();
 }
 
