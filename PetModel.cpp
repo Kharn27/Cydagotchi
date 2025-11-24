@@ -5,6 +5,9 @@
 Pet currentPet;
 bool petInitialized = false;
 
+static LifeStage lastLifeStageForEvents = STAGE_BABY;
+static bool lifeStageJustChanged = false;
+
 const PersonalityModifiers PERSONALITY_MODIFIERS[PERSO_COUNT] = {
   { "Équilibré", 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
   { "Gourmand", 1.4f, 1.0f, 1.0f, 1.0f, 1.0f },
@@ -53,7 +56,14 @@ LifeStage computeLifeStage(float age) {
 }
 
 void updateLifeStage() {
-  currentPet.lifeStage = computeLifeStage(currentPet.age);
+  LifeStage newStage = computeLifeStage(currentPet.age);
+  if (newStage != currentPet.lifeStage) {
+    currentPet.lifeStage = newStage;
+    lifeStageJustChanged = true;
+    lastLifeStageForEvents = newStage;
+  } else {
+    lifeStageJustChanged = false;
+  }
 }
 
 const char* getLifeStageLabel(LifeStage stage) {
@@ -64,6 +74,19 @@ const char* getLifeStageLabel(LifeStage stage) {
     case STAGE_SENIOR: return "Vieux";
     default: return "?";
   }
+}
+
+bool petLifeStageJustChanged() {
+  return lifeStageJustChanged;
+}
+
+void clearLifeStageChangedFlag() {
+  lifeStageJustChanged = false;
+}
+
+void syncLifeStageForEvents() {
+  lastLifeStageForEvents = currentPet.lifeStage;
+  lifeStageJustChanged = false;
 }
 
 void updateNeeds(float dtSeconds) {

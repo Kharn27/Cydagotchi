@@ -66,6 +66,8 @@ bool petLoadFromStorage() {
   // Sécurise la cohérence avec l'âge si la formule évolue
   currentPet.lifeStage = computeLifeStage(currentPet.age);
 
+  syncLifeStageForEvents();
+
   petInitialized = true;
   Serial.println("[Storage] Pet loaded from storage");
   return true;
