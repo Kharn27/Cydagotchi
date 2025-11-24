@@ -6,6 +6,7 @@
  #include <XPT2046_Touchscreen_TT.h>  // tu peux commenter celle-là
 
 #include "PetModel.h"
+#include "PetLogic.h"
 
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
@@ -57,12 +58,6 @@ void actionEat();
 void actionSleep();
 void actionPlay();
 void actionWash();
-
-// Actions applicatives
-void applyPlayerActionEat();
-void applyPlayerActionSleep();
-void applyPlayerActionPlay();
-void applyPlayerActionWash();
 
 // --- Définition des boutons par scène ---
 Button menuButtons[] = {
@@ -372,57 +367,29 @@ void loop() {
   }
 }
 
-// --- Actions de gameplay ---
-void applyPlayerActionEat() {
-  addNeed(currentPet.hunger, 0.35f);
-  addNeed(currentPet.energy, 0.05f);
-  addNeed(currentPet.cleanliness, -0.05f);
-  updateMood();
-}
-
-void applyPlayerActionSleep() {
-  addNeed(currentPet.energy, 0.35f);
-  addNeed(currentPet.hunger, 0.10f);
-  updateMood();
-}
-
-void applyPlayerActionPlay() {
-  addNeed(currentPet.social, 0.25f);
-  addNeed(currentPet.curiosity, 0.20f);
-  addNeed(currentPet.energy, -0.15f);
-  addNeed(currentPet.cleanliness, -0.05f);
-  updateMood();
-}
-
-void applyPlayerActionWash() {
-  addNeed(currentPet.cleanliness, 0.40f);
-  addNeed(currentPet.energy, -0.05f);
-  updateMood();
-}
-
 void actionEat() {
-  applyPlayerActionEat();
+  petApplyEat();
   lastAutoActionMillis = millis();             // reset du timer auto
   setLastAction("Tu lui donnes à manger", false);
   drawGameScreen();
 }
 
 void actionSleep() {
-  applyPlayerActionSleep();
+  petApplySleep();
   lastAutoActionMillis = millis();
   setLastAction("Tu le mets au dodo", false);
   drawGameScreen();
 }
 
 void actionPlay() {
-  applyPlayerActionPlay();
+  petApplyPlay();
   lastAutoActionMillis = millis();
   setLastAction("Tu joues avec lui", false);
   drawGameScreen();
 }
 
 void actionWash() {
-  applyPlayerActionWash();
+  petApplyWash();
   lastAutoActionMillis = millis();
   setLastAction("Tu le laves", false);
   drawGameScreen();
@@ -447,49 +414,23 @@ void actionStartGameFromNewPet() {
 
 // --- Auto action utility AI ---
 void chooseAndApplyAutoAction() {
-  // Scores de manque (1 = besoin urgent)
-  float hungerNeed = 1.0f - currentPet.hunger;
-  float energyNeed = 1.0f - currentPet.energy;
-  float socialNeed = 1.0f - currentPet.social;
-  float cleanNeed  = 1.0f - currentPet.cleanliness;
+  PetActionType act = petChooseAutoAction();
 
-  float needScores[] = { hungerNeed, energyNeed, socialNeed, cleanNeed };
-  enum ActionIndex { ACT_EAT = 0, ACT_SLEEP, ACT_PLAY, ACT_WASH };
-
-  float maxScore = needScores[0];
-  for (size_t i = 1; i < 4; ++i) {
-    if (needScores[i] > maxScore) {
-      maxScore = needScores[i];
-    }
-  }
-
-  // Tolérance pour permettre un choix aléatoire entre besoins proches
-  const float tolerance = 0.05f;
-  ActionIndex candidates[4];
-  size_t candidateCount = 0;
-  for (size_t i = 0; i < 4; ++i) {
-    if (needScores[i] >= maxScore - tolerance) {
-      candidates[candidateCount++] = static_cast<ActionIndex>(i);
-    }
-  }
-
-  ActionIndex chosen = candidates[random(candidateCount)];
-
-  switch (chosen) {
-    case ACT_EAT:
-      applyPlayerActionEat();
+  switch (act) {
+    case PET_ACT_EAT:
+      petApplyEat();
       setLastAction("Cydy va manger tout seul", true);
       break;
-    case ACT_SLEEP:
-      applyPlayerActionSleep();
+    case PET_ACT_SLEEP:
+      petApplySleep();
       setLastAction("Cydy va dormir tout seul", true);
       break;
-    case ACT_PLAY:
-      applyPlayerActionPlay();
+    case PET_ACT_PLAY:
+      petApplyPlay();
       setLastAction("Cydy joue tout seul", true);
       break;
-    case ACT_WASH:
-      applyPlayerActionWash();
+    case PET_ACT_WASH:
+      petApplyWash();
       setLastAction("Cydy se lave tout seul", true);
       break;
   }
