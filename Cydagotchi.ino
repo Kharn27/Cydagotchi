@@ -409,6 +409,9 @@ void actionLoadPet() {
 
 void actionStartGameFromNewPet() {
   Serial.println("Starting game from NEW_PET");
+
+  // Force la création d'un nouveau pet lors de l'entrée en jeu
+  petInitialized = false;
   changeScene(STATE_GAME);
 }
 
