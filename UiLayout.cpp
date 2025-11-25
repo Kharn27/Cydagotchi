@@ -3,6 +3,24 @@
 
 extern Pet currentPet;
 
+namespace {
+uint16_t lightenColor(uint16_t color) {
+  uint8_t r = (color >> 11) & 0x1F;
+  uint8_t g = (color >> 5) & 0x3F;
+  uint8_t b = color & 0x1F;
+
+  auto lighten = [](uint8_t channel, uint8_t maxVal) {
+    return static_cast<uint8_t>(channel + ((maxVal - channel) / 2));
+  };
+
+  r = lighten(r, 31);
+  g = lighten(g, 63);
+  b = lighten(b, 31);
+
+  return static_cast<uint16_t>((r << 11) | (g << 5) | b);
+}
+}  // namespace
+
 void drawButton(const Button& b) {
   tft.fillRoundRect(b.x, b.y, b.w, b.h, 8, b.fillColor);
   tft.drawRoundRect(b.x, b.y, b.w, b.h, 8, b.borderColor);
@@ -11,6 +29,16 @@ void drawButton(const Button& b) {
   tft.setTextColor(b.textColor, b.fillColor);
   tft.setTextFont(2);
   tft.drawString(b.label, b.x + b.w / 2, b.y + b.h / 2);
+}
+
+void drawTopMenuButton(const Button& b, bool active) {
+  Button styled = b;
+  if (active) {
+    styled.fillColor = lightenColor(b.fillColor);
+    styled.borderColor = TFT_WHITE;
+  }
+
+  drawButton(styled);
 }
 
 void drawNeedRow(const char* label, float value, int16_t x, int16_t y) {
