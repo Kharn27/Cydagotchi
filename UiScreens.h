@@ -5,6 +5,7 @@
 void drawTitleScreen();
 void drawMenuScreen();
 void drawNewPetScreen();
+void resetGameScreenCache();
 void drawGameScreenStatic();
 void drawTopMenuBar();
 void drawBottomMenuBar();
