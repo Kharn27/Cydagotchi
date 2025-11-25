@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <cstring>
 #include "UiLayout.h"
 
 extern Pet currentPet;
@@ -33,11 +34,17 @@ void drawButton(const Button& b) {
 
 void drawTopMenuButton(const Button& b, bool active) {
   Button styled = b;
+  const bool isStatsButton = std::strcmp(b.label, "Stats") == 0;
+  const char* displayLabel = b.label;
   if (active) {
     styled.fillColor = lightenColor(b.fillColor);
     styled.borderColor = TFT_WHITE;
+    if (isStatsButton) {
+      displayLabel = "[X]";
+    }
   }
 
+  styled.label = displayLabel;
   drawButton(styled);
 }
 
