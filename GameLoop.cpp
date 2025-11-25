@@ -49,7 +49,6 @@ void gameLoopTick() {
   if (elapsed >= GAME_TICK_INTERVAL_MS) {
     float dtSeconds = static_cast<float>(elapsed) / 1000.0f;
     lastGameTickMillis = now;
-    advanceGameClock(dtSeconds);
     updateNeeds(dtSeconds);
     if (petLifeStageJustChanged()) {
       setLastAction(getLifeStageChangeMessage(getLastLifeStageForEvents(), currentPet.lifeStage), false);
