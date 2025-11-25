@@ -40,12 +40,13 @@ File pngFile;
 struct BackgroundDrawContext {
   int frameIndex = 0;
   int frameHeight = 0;
+  int frameCount = 0;
 };
 
 BackgroundDrawContext backgroundContext;
 
-const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet observed at 5 frames vertically
-constexpr int BACKGROUND_FRAME_COUNT = 5;                   // 5 stacked tiles (104x103 each)
+const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet observed at 3 frames vertically
+constexpr int BACKGROUND_FRAME_COUNT = 3;                   // 3 stacked tiles (104x171 each)
 constexpr int BACKGROUND_MAX_SOURCE_WIDTH = 128;            // frames are 104 px wide, keep guard room
 
 Pet cachedPet = {};
@@ -56,15 +57,21 @@ GameView cachedView = VIEW_MAIN;
 bool backgroundDrawn = false;
 TimeOfDaySlot lastSlot = SLOT_NIGHT;
 
-int frameForSlot(TimeOfDaySlot slot) {
+int frameForSlot(TimeOfDaySlot slot, int availableFrames) {
+  if (availableFrames <= 0) return 0;
+
+  int preferred = 0;
   switch (slot) {
-    case SLOT_NIGHT: return 0;
-    case SLOT_DAWN: return 1;
-    case SLOT_DAY: return 2;
-    case SLOT_EVENING: return 3;
-    case SLOT_STORM: return 4;
-    default: return 0;
+    case SLOT_NIGHT: preferred = 0; break;
+    case SLOT_DAWN: preferred = 1; break;
+    case SLOT_DAY: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
+    case SLOT_EVENING: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
+    case SLOT_STORM: preferred = 0; break;
+    default: preferred = 0; break;
   }
+
+  if (preferred >= availableFrames) return availableFrames - 1;
+  return preferred;
 }
 
 void* pngOpen(const char* filename, int32_t* size) {
@@ -133,6 +140,7 @@ bool drawBackgroundFrame(int frameIndex) {
 
   int imageHeight = png.getHeight();
   backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
+  backgroundContext.frameCount = BACKGROUND_FRAME_COUNT;
   backgroundContext.frameIndex = frameIndex;
 
 #if DEBUG_BACKGROUND
@@ -156,7 +164,8 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   }
 
   redrawn = true;
-  bool ok = drawBackgroundFrame(frameForSlot(slot));
+  int targetFrame = frameForSlot(slot, backgroundContext.frameCount > 0 ? backgroundContext.frameCount : BACKGROUND_FRAME_COUNT);
+  bool ok = drawBackgroundFrame(targetFrame);
   if (!ok) {
     // Fallback to a solid background so the content area is always cleaned.
     tft.fillScreen(TFT_BLACK);
