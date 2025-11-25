@@ -197,8 +197,12 @@ void actionShowStats() {
 }
 
 void actionShowFeed() {
-  currentGameView = (currentGameView == VIEW_FEED) ? VIEW_GAME : VIEW_FEED;
-  setLastAction(currentGameView == VIEW_FEED ? "Ecran Manger" : "Retour a la vue principale", false);
+  bool enterFeedView = currentGameView != VIEW_FEED;
+
+  // Maintain manual feeding when tapping the top menu.
+  actionEat();
+
+  currentGameView = enterFeedView ? VIEW_FEED : VIEW_GAME;
   drawGameScreenDynamic();
 }
 
@@ -209,11 +213,8 @@ void actionShowWorld() {
 }
 
 void actionShowGame() {
-  if (currentGameView != VIEW_GAME) {
-    currentGameView = VIEW_GAME;
-    setLastAction("Retour a la vue principale", false);
-    drawGameScreenDynamic();
-  }
+  // Keep manual play available from the top menu while returning to the main view.
+  actionPlay();
 }
 
 void chooseAndApplyAutoAction() {
