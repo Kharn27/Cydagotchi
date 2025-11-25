@@ -34,6 +34,13 @@ enum GameView {
   VIEW_STATS
 };
 
+enum TopMenuIndex {
+  TOPMENU_STATS = 0,
+  TOPMENU_MANGER,
+  TOPMENU_JEU,
+  TOPMENU_MONDE
+};
+
 // Enriched button description reused across screens.
 typedef void (*ButtonAction)();
 

@@ -19,6 +19,18 @@ extern bool hasNewPetPersonality;
 extern char newPetName[16];
 extern bool hasNewPetName;
 
+void drawTopMenuBar() {
+  tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
+
+  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
+    bool active =
+        (i == TOPMENU_STATS && currentGameView == VIEW_STATS) ||
+        (i == TOPMENU_JEU && currentGameView == VIEW_MAIN);
+
+    drawTopMenuButton(topMenuButtons[i], active);
+  }
+}
+
 void drawTitleScreen() {
   tft.fillScreen(TFT_BLACK);
 
@@ -71,13 +83,7 @@ void drawGameScreenStatic() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
-  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
-    const char* label = topMenuButtons[i].label;
-    bool active = (strcmp(label, "Stats") == 0 && currentGameView == VIEW_STATS) ||
-                  (strcmp(label, "Jeu") == 0 && currentGameView == VIEW_MAIN);
-    drawTopMenuButton(topMenuButtons[i], active);
-  }
+  drawTopMenuBar();
 
   tft.fillRect(0, ALERT_AREA_Y, SCREEN_W, BOTTOM_MENU_HEIGHT, HUD_BAND_COLOR);
   for (size_t i = 0; i < BOTTOMMENU_BUTTON_COUNT; ++i) {
@@ -192,6 +198,10 @@ void drawGameScreenDynamic() {
 
   bool viewChanged = !drawInitialized || cachedView != currentGameView;
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
+
+  if (viewChanged) {
+    drawTopMenuBar();
+  }
 
   if (currentGameView == VIEW_MAIN) {
     drawGameViewMain(headerDirty || viewChanged, needsDirty || viewChanged, faceDirty || viewChanged);
