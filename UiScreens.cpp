@@ -4,6 +4,7 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include <PNGdec.h>
+#include "Clock.h"
 #include "UiScreens.h"
 #include "Actions.h"
 #include "GameState.h"
@@ -27,6 +28,10 @@ extern PersonalityType newPetPersonality;
 extern bool hasNewPetPersonality;
 extern char newPetName[16];
 extern bool hasNewPetName;
+
+#ifndef DEBUG_BACKGROUND
+#define DEBUG_BACKGROUND 0
+#endif
 
 namespace {
 PNG png;
@@ -129,13 +134,18 @@ bool drawBackgroundFrame(int frameIndex) {
   backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
   backgroundContext.frameIndex = frameIndex;
 
+#if DEBUG_BACKGROUND
+  Serial.printf("[Background] Decoding frame %d from %s (imageH=%d, frameH=%d)\n", frameIndex, BACKGROUND_IMAGE_PATH,
+                imageHeight, backgroundContext.frameHeight);
+#endif
+
   tft.setSwapBytes(true);
   png.decode(nullptr, 0);
   png.close();
   return true;
 }
 
-bool drawBackgroundForCurrentTime(bool forceRedraw) {
+bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   static bool backgroundDrawn = false;
   static TimeOfDaySlot lastSlot = SLOT_NIGHT;
 
@@ -145,9 +155,11 @@ bool drawBackgroundForCurrentTime(bool forceRedraw) {
   TimeOfDaySlot slot = slotForTime(hours, minutes);
 
   if (!forceRedraw && backgroundDrawn && slot == lastSlot) {
-    return false;
+    redrawn = false;
+    return true;
   }
 
+  redrawn = true;
   bool ok = drawBackgroundFrame(frameForSlot(slot));
   if (!ok) {
     tft.fillScreen(TFT_BLACK);
@@ -155,7 +167,7 @@ bool drawBackgroundForCurrentTime(bool forceRedraw) {
 
   lastSlot = slot;
   backgroundDrawn = true;
-  return true;
+  return ok;
 }
 
 TopMenuId activeTopMenuForView(GameView view) {
@@ -232,6 +244,11 @@ void drawBottomMenuBar() {
   }
 }
 
+void clearContentArea() {
+  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
+  tft.fillRect(0, TOP_MENU_HEIGHT, SCREEN_W, contentH, TFT_BLACK);
+}
+
 void drawTitleScreen() {
   tft.fillScreen(TFT_BLACK);
 
@@ -280,7 +297,8 @@ void drawNewPetScreen() {
 }
 
 void drawGameScreenStatic() {
-  drawBackgroundForCurrentTime(true);
+  bool backgroundRedrawn = false;
+  drawBackgroundForCurrentTime(true, backgroundRedrawn);
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
@@ -445,8 +463,9 @@ void drawGameScreenDynamic() {
   tft.setTextFont(2);
 
   bool viewChanged = !drawInitialized || cachedView != currentGameView;
-  bool backgroundUpdated = drawBackgroundForCurrentTime(viewChanged);
-  bool navChanged = viewChanged || backgroundUpdated;
+  bool backgroundRedrawn = false;
+  bool backgroundOk = drawBackgroundForCurrentTime(viewChanged, backgroundRedrawn);
+  bool navNeedsRedraw = viewChanged || backgroundRedrawn;
 
   bool headerDirty = !drawInitialized || viewChanged ||
                      strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
@@ -464,7 +483,7 @@ void drawGameScreenDynamic() {
 
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
-  if (backgroundUpdated) {
+  if (backgroundRedrawn || viewChanged) {
     headerDirty = true;
     needsDirty = true;
     faceDirty = true;
@@ -472,17 +491,13 @@ void drawGameScreenDynamic() {
     alertDirty = true;
   }
 
-  if (navChanged) {
-    // When switching views, rebuild the top bar, clear the content zone, and force a full redraw
-    // so the first frame of the Stats panel is properly aligned (no delayed resync).
+  if (navNeedsRedraw) {
     drawTopMenuBar();
     drawBottomMenuBar();
-    headerDirty = true;
-    needsDirty = true;
-    faceDirty = true;
-    actionDirty = true;
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextFont(2);
+  }
+
+  if (viewChanged && !backgroundOk) {
+    clearContentArea();
   }
 
   if (currentGameView == VIEW_MAIN) {
@@ -507,7 +522,7 @@ void drawGameScreenDynamic() {
     drawGameViewDuelMenu(duelDirty);
   }
 
-  drawGameClock(navChanged);
+  drawGameClock(navNeedsRedraw);
 
   if (actionDirty || viewChanged) {
     tft.setTextDatum(TL_DATUM);

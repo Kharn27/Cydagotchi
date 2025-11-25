@@ -15,6 +15,7 @@
 #include "Actions.h"
 #include "GameState.h"
 #include "GameLoop.h"
+#include "Clock.h"
 
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
@@ -132,7 +133,7 @@ void changeScene(AppState next) {
         setLastAction(birthMsg, false);
       }
       lastGameTickMillis = millis();
-      resetGameClock();
+      clockReset();
       lastAutoActionMillis = lastGameTickMillis;
       lastRedrawMillis = lastGameTickMillis;
       lastAutoSaveMillis = lastGameTickMillis;
@@ -162,6 +163,8 @@ void setup() {
 
   lightsOff = false;
   tft.invertDisplay(false);
+
+  clockInit();
 
   changeScene(STATE_TITLE);
 }
