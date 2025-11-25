@@ -89,12 +89,12 @@ int32_t pngSeek(PNGFILE* file, int32_t position) {
   return position;
 }
 
-void pngBackgroundDraw(PNGDRAW* pDraw) {
-  if (backgroundContext.frameHeight <= 0) return;
+int pngBackgroundDraw(PNGDRAW* pDraw) {
+  if (backgroundContext.frameHeight <= 0) return 1;
 
   int frameTop = backgroundContext.frameIndex * backgroundContext.frameHeight;
   int frameBottom = frameTop + backgroundContext.frameHeight;
-  if (pDraw->y < frameTop || pDraw->y >= frameBottom) return;
+  if (pDraw->y < frameTop || pDraw->y >= frameBottom) return 1;
 
   static uint16_t sourceLine[SCREEN_W];
   static uint16_t scaledLine[SCREEN_W];
@@ -115,6 +115,7 @@ void pngBackgroundDraw(PNGDRAW* pDraw) {
   for (int dy = 0; dy < destLines && destYStart + dy < SCREEN_H; ++dy) {
     tft.pushImage(0, destYStart + dy, SCREEN_W, 1, scaledLine);
   }
+  return 1;
 }
 
 bool drawBackgroundFrame(int frameIndex) {
@@ -590,4 +591,3 @@ void drawGameScreen() {
   drawGameScreenStatic();
   drawGameScreenDynamic();
 }
-
