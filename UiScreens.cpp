@@ -93,15 +93,18 @@ void drawGameScreenStatic() {
   tft.fillRect(ALERT_AREA_X, ALERT_AREA_Y, ALERT_AREA_W, ALERT_AREA_H, HUD_BAND_COLOR);
 }
 
-void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty) {
+void drawGameViewMain(bool headerDirty, bool faceDirty, bool forceClear) {
   const int16_t headerY = TOP_MENU_HEIGHT + 4;
   const int16_t contentH = ACTION_AREA_Y - headerY;
 
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  if (headerDirty || needsDirty || faceDirty) {
+  bool clearAll = forceClear || headerDirty;
+  if (clearAll) {
     tft.fillRect(0, headerY, SCREEN_W, contentH, TFT_BLACK);
+    headerDirty = true;
+    faceDirty = true;
   }
 
   if (headerDirty) {
@@ -204,7 +207,7 @@ void drawGameScreenDynamic() {
   }
 
   if (currentGameView == VIEW_MAIN) {
-    drawGameViewMain(headerDirty || viewChanged, needsDirty || viewChanged, faceDirty || viewChanged);
+    drawGameViewMain(headerDirty, faceDirty, viewChanged);
   } else {
     bool statsDirty = headerDirty || needsDirty || faceDirty || viewChanged;
     drawGameViewStats(statsDirty);

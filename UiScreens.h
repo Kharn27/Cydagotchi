@@ -7,7 +7,7 @@ void drawMenuScreen();
 void drawNewPetScreen();
 void drawGameScreenStatic();
 void drawTopMenuBar();
-void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty);
+void drawGameViewMain(bool headerDirty, bool faceDirty, bool forceClear);
 void drawGameViewStats(bool statsDirty);
 void drawAlertIcon();
 void drawGameScreenDynamic();
