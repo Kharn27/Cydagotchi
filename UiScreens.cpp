@@ -40,33 +40,38 @@ File pngFile;
 struct BackgroundDrawContext {
   int frameIndex = 0;
   int frameHeight = 0;
+  int frameCount = 0;
 };
 
 BackgroundDrawContext backgroundContext;
 
-enum TimeOfDaySlot { SLOT_NIGHT = 0, SLOT_DAWN = 1, SLOT_DAY = 2 };
-
 const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet observed at 3 frames vertically
-constexpr int BACKGROUND_FRAME_COUNT = 3;
+constexpr int BACKGROUND_FRAME_COUNT = 3;                   // 3 stacked tiles (104x171 each)
+constexpr int BACKGROUND_MAX_SOURCE_WIDTH = 128;            // frames are 104 px wide, keep guard room
 
-TimeOfDaySlot slotForTime(int hours, int minutes) {
-  int totalMinutes = hours * 60 + minutes;
-  int nightStart = 21 * 60 + 30;
-  int dawnStart = 6 * 60 + 30;
-  int dayStart = 8 * 60 + 30;
+Pet cachedPet = {};
+bool drawInitialized = false;
+char cachedAction[sizeof(lastActionText)] = "";
+bool cachedActionAuto = false;
+GameView cachedView = VIEW_MAIN;
+bool backgroundDrawn = false;
+TimeOfDaySlot lastSlot = SLOT_NIGHT;
 
-  if (totalMinutes >= nightStart || totalMinutes < dawnStart) return SLOT_NIGHT;
-  if (totalMinutes < dayStart) return SLOT_DAWN;
-  return SLOT_DAY;
-}
+int frameForSlot(TimeOfDaySlot slot, int availableFrames) {
+  if (availableFrames <= 0) return 0;
 
-int frameForSlot(TimeOfDaySlot slot) {
+  int preferred = 0;
   switch (slot) {
-    case SLOT_NIGHT: return 0;
-    case SLOT_DAWN: return 1;
-    case SLOT_DAY: return 2;
+    case SLOT_NIGHT: preferred = 0; break;
+    case SLOT_DAWN: preferred = 1; break;
+    case SLOT_DAY: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
+    case SLOT_EVENING: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
+    case SLOT_STORM: preferred = 0; break;
+    default: preferred = 0; break;
   }
-  return 0;
+
+  if (preferred >= availableFrames) return availableFrames - 1;
+  return preferred;
 }
 
 void* pngOpen(const char* filename, int32_t* size) {
@@ -101,7 +106,10 @@ int pngBackgroundDraw(PNGDRAW* pDraw) {
   int frameBottom = frameTop + backgroundContext.frameHeight;
   if (pDraw->y < frameTop || pDraw->y >= frameBottom) return 1;
 
-  static uint16_t sourceLine[SCREEN_W];
+  int frameWidth = pDraw->iWidth;
+  if (frameWidth <= 0 || frameWidth > BACKGROUND_MAX_SOURCE_WIDTH) return 1;
+
+  static uint16_t sourceLine[BACKGROUND_MAX_SOURCE_WIDTH];
   static uint16_t scaledLine[SCREEN_W];
 
   png.getLineAsRGB565(pDraw, sourceLine, PNG_RGB565_BIG_ENDIAN, 0xFFFFFFFF);
@@ -113,7 +121,7 @@ int pngBackgroundDraw(PNGDRAW* pDraw) {
   if (destLines <= 0) destLines = 1;
 
   for (int x = 0; x < SCREEN_W; ++x) {
-    int srcX = (x * pDraw->iWidth) / SCREEN_W;
+    int srcX = (x * frameWidth) / SCREEN_W;
     scaledLine[x] = sourceLine[srcX];
   }
 
@@ -132,6 +140,7 @@ bool drawBackgroundFrame(int frameIndex) {
 
   int imageHeight = png.getHeight();
   backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
+  backgroundContext.frameCount = BACKGROUND_FRAME_COUNT;
   backgroundContext.frameIndex = frameIndex;
 
 #if DEBUG_BACKGROUND
@@ -146,13 +155,7 @@ bool drawBackgroundFrame(int frameIndex) {
 }
 
 bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
-  static bool backgroundDrawn = false;
-  static TimeOfDaySlot lastSlot = SLOT_NIGHT;
-
-  int hours = 0;
-  int minutes = 0;
-  getGameTime(hours, minutes);
-  TimeOfDaySlot slot = slotForTime(hours, minutes);
+  TimeOfDaySlot slot = getTimeOfDaySlot();
 
   bool shouldRedraw = forceRedraw || !backgroundDrawn || slot != lastSlot;
   if (!shouldRedraw) {
@@ -161,7 +164,8 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   }
 
   redrawn = true;
-  bool ok = drawBackgroundFrame(frameForSlot(slot));
+  int targetFrame = frameForSlot(slot, backgroundContext.frameCount > 0 ? backgroundContext.frameCount : BACKGROUND_FRAME_COUNT);
+  bool ok = drawBackgroundFrame(targetFrame);
   if (!ok) {
     // Fallback to a solid background so the content area is always cleaned.
     tft.fillScreen(TFT_BLACK);
@@ -221,7 +225,19 @@ void drawWipViewWithButtons(const char* title, const char* subtitle, Button* but
     }
   }
 }
+
 }  // namespace
+
+void resetGameScreenCache() {
+  cachedPet = {};
+  drawInitialized = false;
+  cachedAction[0] = '\0';
+  cachedActionAuto = false;
+  cachedView = VIEW_MAIN;
+  backgroundDrawn = false;
+  lastSlot = SLOT_NIGHT;
+  backgroundContext = {};
+}
 
 void drawTopMenuBar() {
   tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
@@ -316,31 +332,37 @@ void drawGameScreenStatic() {
 
 void drawGameViewMain(bool headerDirty, bool faceDirty, bool forceClear) {
   const int16_t headerY = TOP_MENU_HEIGHT + 4;
-  const int16_t contentH = ACTION_AREA_Y - headerY;
+  const int16_t infoPanelW = SCREEN_W / 2 + 40;
+  const int16_t infoPanelH = 70;
+  const int16_t infoPanelX = 4;
 
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  bool clearAll = forceClear || headerDirty;
-  if (clearAll) {
-    tft.fillRect(0, headerY, SCREEN_W / 2 + 60, contentH, TFT_BLACK);
-    tft.fillRect(SCREEN_W - 130, headerY, 122, 90, TFT_BLACK);
+  if (forceClear) {
+    clearContentArea();
     headerDirty = true;
     faceDirty = true;
   }
 
   if (headerDirty) {
+    tft.fillRoundRect(infoPanelX, headerY, infoPanelW, infoPanelH, 8, TFT_BLACK);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 6);
-    tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, headerY + 20);
+    tft.drawString(String("Nom: ") + currentPet.name, infoPanelX + 6, headerY + 6);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", infoPanelX + 6, headerY + 20);
     tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-    tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, headerY + 32);
+    tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, infoPanelX + 6,
+                   headerY + 32);
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
-    tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, headerY + 46);
+    tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), infoPanelX + 6, headerY + 46);
   }
 
   if (faceDirty) {
-    tft.fillRect(SCREEN_W - 130, headerY, 122, 90, TFT_BLACK);
+    const int16_t facePanelX = SCREEN_W - 132;
+    const int16_t facePanelW = 124;
+    const int16_t facePanelH = 92;
+    tft.fillRoundRect(facePanelX, headerY, facePanelW, facePanelH, 8, TFT_BLACK);
     drawPetFace();
   }
 }
@@ -349,8 +371,11 @@ void drawGameViewStats(bool statsDirty) {
   if (!statsDirty) return;
 
   const int16_t contentY = TOP_MENU_HEIGHT;
-  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
-  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+  const int16_t panelX = 6;
+  const int16_t panelY = contentY + 4;
+  const int16_t panelW = SCREEN_W - 12;
+  const int16_t panelH = ACTION_AREA_Y - panelY - 6;
+  tft.fillRoundRect(panelX, panelY, panelW, panelH, 10, TFT_BLACK);
 
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
@@ -453,12 +478,6 @@ void drawGameClock(bool force) {
 }
 
 void drawGameScreenDynamic() {
-  static Pet cachedPet = {};
-  static bool drawInitialized = false;
-  static char cachedAction[sizeof(lastActionText)] = "";
-  static bool cachedActionAuto = false;
-  static GameView cachedView = VIEW_MAIN;
-
   auto valueChanged = [](float a, float b, float epsilon) {
     return fabsf(a - b) >= epsilon;
   };
@@ -470,6 +489,14 @@ void drawGameScreenDynamic() {
   bool backgroundRedrawn = false;
   bool backgroundOk = drawBackgroundForCurrentTime(viewChanged, backgroundRedrawn);
   bool navNeedsRedraw = viewChanged || backgroundRedrawn;
+
+  // If the background failed to draw or hasn't been refreshed for this view change,
+  // clear the content zone once to avoid remnants.
+  if (!backgroundOk) {
+    clearContentArea();
+  } else if (viewChanged && !backgroundRedrawn) {
+    clearContentArea();
+  }
 
   bool headerDirty = !drawInitialized || viewChanged ||
                      strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
@@ -487,13 +514,6 @@ void drawGameScreenDynamic() {
 
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
-  if (!backgroundOk) {
-    clearContentArea();
-  } else if (viewChanged && !backgroundRedrawn) {
-    // If we didn't repaint the background (rare), still ensure the content area is fresh.
-    clearContentArea();
-  }
-
   if (backgroundRedrawn || viewChanged) {
     headerDirty = true;
     needsDirty = true;
@@ -507,8 +527,9 @@ void drawGameScreenDynamic() {
     drawBottomMenuBar();
   }
 
+  bool forceClearView = viewChanged && !backgroundRedrawn;
   if (currentGameView == VIEW_MAIN) {
-    drawGameViewMain(headerDirty, faceDirty, viewChanged);
+    drawGameViewMain(headerDirty, faceDirty, forceClearView);
   } else if (currentGameView == VIEW_STATS) {
     bool statsDirty = headerDirty || needsDirty || faceDirty || viewChanged;
     drawGameViewStats(statsDirty);

@@ -28,3 +28,20 @@ void getGameTime(int &hours, int &minutes) {
   minutes = static_cast<int>(dayMinutes % 60UL);
 }
 
+TimeOfDaySlot getTimeOfDaySlot() {
+  int hours = 0;
+  int minutes = 0;
+  getGameTime(hours, minutes);
+
+  int totalMinutes = hours * 60 + minutes;
+  int nightStart = 21 * 60 + 30;
+  int dawnStart = 6 * 60 + 30;
+  int dayStart = 8 * 60 + 30;
+  int eveningStart = 21 * 60 + 30;
+
+  if (totalMinutes >= nightStart || totalMinutes < dawnStart) return SLOT_NIGHT;
+  if (totalMinutes < dayStart) return SLOT_DAWN;
+  if (totalMinutes < eveningStart) return SLOT_DAY;
+  return SLOT_EVENING;
+}
+

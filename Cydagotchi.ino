@@ -120,6 +120,7 @@ void changeScene(AppState next) {
       break;
     case STATE_GAME:
       currentGameView = VIEW_MAIN;
+      resetGameScreenCache();
       if (!petInitialized) {
         if (hasNewPetPersonality && hasNewPetName) {
           initPetWithPersonality(newPetPersonality, newPetName);
