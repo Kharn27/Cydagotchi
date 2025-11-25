@@ -154,7 +154,8 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   getGameTime(hours, minutes);
   TimeOfDaySlot slot = slotForTime(hours, minutes);
 
-  if (!forceRedraw && backgroundDrawn && slot == lastSlot) {
+  bool shouldRedraw = forceRedraw || !backgroundDrawn || slot != lastSlot;
+  if (!shouldRedraw) {
     redrawn = false;
     return true;
   }
@@ -162,12 +163,15 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   redrawn = true;
   bool ok = drawBackgroundFrame(frameForSlot(slot));
   if (!ok) {
+    // Fallback to a solid background so the content area is always cleaned.
     tft.fillScreen(TFT_BLACK);
+    backgroundDrawn = false;
+    return false;
   }
 
   lastSlot = slot;
   backgroundDrawn = true;
-  return ok;
+  return true;
 }
 
 TopMenuId activeTopMenuForView(GameView view) {
@@ -483,6 +487,13 @@ void drawGameScreenDynamic() {
 
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
+  if (!backgroundOk) {
+    clearContentArea();
+  } else if (viewChanged && !backgroundRedrawn) {
+    // If we didn't repaint the background (rare), still ensure the content area is fresh.
+    clearContentArea();
+  }
+
   if (backgroundRedrawn || viewChanged) {
     headerDirty = true;
     needsDirty = true;
@@ -494,10 +505,6 @@ void drawGameScreenDynamic() {
   if (navNeedsRedraw) {
     drawTopMenuBar();
     drawBottomMenuBar();
-  }
-
-  if (viewChanged && !backgroundOk) {
-    clearContentArea();
   }
 
   if (currentGameView == VIEW_MAIN) {
