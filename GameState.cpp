@@ -7,12 +7,22 @@ unsigned long lastGameTickMillis = 0;
 unsigned long lastAutoActionMillis = 0;
 unsigned long lastRedrawMillis = 0;
 unsigned long lastAutoSaveMillis = 0;
-unsigned long gameClockStartMillis = 0;
+float gameMinutesSinceMidnight = 0.0f;
+
+void resetGameClock() {
+  gameMinutesSinceMidnight = 0.0f;
+}
+
+void advanceGameClock(float dtSeconds) {
+  gameMinutesSinceMidnight += dtSeconds * GAME_MINUTES_PER_REAL_SECOND;
+
+  while (gameMinutesSinceMidnight >= static_cast<float>(GAME_MINUTES_PER_DAY)) {
+    gameMinutesSinceMidnight -= static_cast<float>(GAME_MINUTES_PER_DAY);
+  }
+}
 
 void getGameTime(int &hours, int &minutes) {
-  unsigned long realElapsed = millis() - gameClockStartMillis;
-  unsigned long gameMinutes = (realElapsed * GAME_MINUTES_PER_DAY) / REAL_MS_PER_GAME_DAY;
-
-  hours = (gameMinutes / 60) % 24;
-  minutes = gameMinutes % 60;
+  unsigned long wholeMinutes = static_cast<unsigned long>(gameMinutesSinceMidnight) % GAME_MINUTES_PER_DAY;
+  hours = static_cast<int>(wholeMinutes / 60UL);
+  minutes = static_cast<int>(wholeMinutes % 60UL);
 }
