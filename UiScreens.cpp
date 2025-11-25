@@ -19,6 +19,14 @@ extern bool hasNewPetPersonality;
 extern char newPetName[16];
 extern bool hasNewPetName;
 
+namespace {
+void clearGameContentArea() {
+  const int16_t contentY = TOP_MENU_HEIGHT;
+  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
+  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+}
+}  // namespace
+
 void drawTopMenuBar() {
   tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
 
@@ -132,6 +140,9 @@ void drawGameViewStats(bool statsDirty) {
   const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
   tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(2);
+
   const int16_t headerY = contentY + 4;
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 6);
@@ -240,9 +251,9 @@ void drawGameScreenDynamic() {
 
   if (viewChanged) {
     drawTopMenuBar();
-    const int16_t contentY = TOP_MENU_HEIGHT;
-    const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
-    tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+    clearGameContentArea();
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(2);
   }
 
   if (currentGameView == VIEW_GAME) {
