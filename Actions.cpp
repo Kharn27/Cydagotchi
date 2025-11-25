@@ -23,6 +23,15 @@ char lastActionText[32] = "Bienvenue !";
 bool lastActionIsAuto = false;
 bool lightsOff = false;
 
+// Helper to leave secondary views (like stats) when performing gameplay actions.
+static void ensureMainGameView() {
+  if (currentGameView != VIEW_MAIN) {
+    currentGameView = VIEW_MAIN;
+    drawGameScreenStatic();
+    drawGameScreenDynamic();
+  }
+}
+
 static void copyCurrentPresetName() {
   strncpy(newPetName, PRESET_NAMES[newPetNameIndex], sizeof(newPetName));
   newPetName[sizeof(newPetName) - 1] = '\0';
@@ -132,6 +141,7 @@ void actionNextName() {
 }
 
 void actionEat() {
+  ensureMainGameView();
   petApplyEat();
   lastAutoActionMillis = millis();
   setLastAction("Tu lui donnes a manger", false);
@@ -140,6 +150,7 @@ void actionEat() {
 }
 
 void actionSleep() {
+  ensureMainGameView();
   petApplySleep();
   lastAutoActionMillis = millis();
   setLastAction("Tu le mets au dodo", false);
@@ -148,6 +159,7 @@ void actionSleep() {
 }
 
 void actionPlay() {
+  ensureMainGameView();
   petApplyPlay();
   lastAutoActionMillis = millis();
   setLastAction("Tu joues avec lui", false);
@@ -156,6 +168,7 @@ void actionPlay() {
 }
 
 void actionWash() {
+  ensureMainGameView();
   petApplyWash();
   lastAutoActionMillis = millis();
   setLastAction("Tu le laves", false);
@@ -164,6 +177,7 @@ void actionWash() {
 }
 
 void actionToggleLights() {
+  ensureMainGameView();
   lightsOff = !lightsOff;
   tft.invertDisplay(lightsOff);
   setLastAction(lightsOff ? "Lumiere OFF" : "Lumiere ON", false);
@@ -171,6 +185,7 @@ void actionToggleLights() {
 }
 
 void actionDuel() {
+  ensureMainGameView();
   setLastAction("Duel (WIP)", false);
   drawGameScreenDynamic();
 }
@@ -182,6 +197,7 @@ void actionShowStats() {
 }
 
 void actionStubWorld() {
+  ensureMainGameView();
   setLastAction("Monde / arene (WIP)", false);
   drawGameScreenDynamic();
 }

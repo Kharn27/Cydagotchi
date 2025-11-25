@@ -186,24 +186,29 @@ void drawGameScreenDynamic() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  bool headerDirty = !drawInitialized || strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
+  bool viewChanged = !drawInitialized || cachedView != currentGameView;
+
+  bool headerDirty = !drawInitialized || viewChanged ||
+                     strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
                      cachedPet.personality != currentPet.personality || cachedPet.lifeStage != currentPet.lifeStage ||
                      valueChanged(cachedPet.age, currentPet.age, 0.05f);
-  bool needsDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.01f) ||
+  bool needsDirty = !drawInitialized || viewChanged || valueChanged(cachedPet.mood, currentPet.mood, 0.01f) ||
                     valueChanged(cachedPet.hunger, currentPet.hunger, 0.01f) ||
                     valueChanged(cachedPet.energy, currentPet.energy, 0.01f) ||
                     valueChanged(cachedPet.social, currentPet.social, 0.01f) ||
                     valueChanged(cachedPet.cleanliness, currentPet.cleanliness, 0.01f) ||
                     valueChanged(cachedPet.curiosity, currentPet.curiosity, 0.01f);
-  bool faceDirty = !drawInitialized || valueChanged(cachedPet.mood, currentPet.mood, 0.02f);
-  bool actionDirty = !drawInitialized || cachedActionAuto != lastActionIsAuto ||
+  bool faceDirty = !drawInitialized || viewChanged || valueChanged(cachedPet.mood, currentPet.mood, 0.02f);
+  bool actionDirty = !drawInitialized || viewChanged || cachedActionAuto != lastActionIsAuto ||
                      strncmp(cachedAction, lastActionText, sizeof(lastActionText)) != 0;
 
-  bool viewChanged = !drawInitialized || cachedView != currentGameView;
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
   if (viewChanged) {
     drawTopMenuBar();
+    const int16_t contentY = TOP_MENU_HEIGHT;
+    const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
+    tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
   }
 
   if (currentGameView == VIEW_MAIN) {
