@@ -49,27 +49,27 @@ Button newPetButtons[] = {
   { 70, 210, 180, 30, "Demarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
 };
 
-const int16_t topMenuButtonWidth = SCREEN_W / (TOPMENU_MONDE + 1);
+const int16_t topMenuButtonWidth = SCREEN_W / TOPMENU_COUNT;
 Button topMenuButtons[] = {
   { topMenuButtonWidth * TOPMENU_STATS, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats, TOPMENU_STATS },
-  { topMenuButtonWidth * TOPMENU_MANGER, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed, TOPMENU_MANGER },
-  { topMenuButtonWidth * TOPMENU_JEU, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionShowGame, TOPMENU_JEU },
-  { topMenuButtonWidth * TOPMENU_MONDE, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionShowWorld, TOPMENU_MONDE }
+  { topMenuButtonWidth * TOPMENU_EAT, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed, TOPMENU_EAT },
+  { topMenuButtonWidth * TOPMENU_PLAY, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionShowPlayMenu, TOPMENU_PLAY },
+  { topMenuButtonWidth * TOPMENU_WORLD, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionShowWorldMenu, TOPMENU_WORLD }
 };
 
-static_assert(TOPMENU_MONDE + 1 == (sizeof(topMenuButtons) / sizeof(topMenuButtons[0])),
+static_assert(TOPMENU_COUNT == (sizeof(topMenuButtons) / sizeof(topMenuButtons[0])),
               "Top menu button array size must match enum indices");
 
 const int16_t bottomButtonWidth = (SCREEN_W - ALERT_AREA_W) / 3;
 Button bottomMenuButtons[] = {
-  { 0, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Lumiere", TFT_DARKGREY, TFT_WHITE, HUD_BORDER_COLOR, actionToggleLights },
-  { bottomButtonWidth, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Toilette", TFT_CYAN, TFT_BLACK, HUD_BORDER_COLOR, actionWash },
-  { bottomButtonWidth * 2, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Duel", TFT_RED, TFT_WHITE, HUD_BORDER_COLOR, actionDuel }
+  { 0, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Lumiere", TFT_DARKGREY, TFT_WHITE, HUD_BORDER_COLOR, actionToggleLights, BOTTOMMENU_LIGHTS },
+  { bottomButtonWidth, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Toilette", TFT_CYAN, TFT_BLACK, HUD_BORDER_COLOR, actionShowToiletMenu, BOTTOMMENU_TOILET },
+  { bottomButtonWidth * 2, ALERT_AREA_Y, bottomButtonWidth, BOTTOM_MENU_HEIGHT, "Duel", TFT_RED, TFT_WHITE, HUD_BORDER_COLOR, actionShowDuelMenu, BOTTOMMENU_DUEL }
 };
 
 extern const size_t MENU_BUTTON_COUNT       = sizeof(menuButtons) / sizeof(menuButtons[0]);
 extern const size_t NEWPET_BUTTON_COUNT     = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
-extern const size_t TOPMENU_BUTTON_COUNT    = TOPMENU_MONDE + 1;
+extern const size_t TOPMENU_BUTTON_COUNT    = TOPMENU_COUNT;
 extern const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
 
 void changeScene(AppState next) {
@@ -97,7 +97,7 @@ void changeScene(AppState next) {
       drawNewPetScreen();
       break;
     case STATE_GAME:
-      currentGameView = VIEW_GAME;
+      currentGameView = VIEW_MAIN;
       if (!petInitialized) {
         if (hasNewPetPersonality && hasNewPetName) {
           initPetWithPersonality(newPetPersonality, newPetName);
@@ -111,6 +111,7 @@ void changeScene(AppState next) {
         setLastAction(birthMsg, false);
       }
       lastGameTickMillis = millis();
+      gameClockStartMillis = lastGameTickMillis;
       lastAutoActionMillis = lastGameTickMillis;
       lastRedrawMillis = lastGameTickMillis;
       lastAutoSaveMillis = lastGameTickMillis;

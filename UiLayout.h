@@ -8,7 +8,7 @@
 constexpr int16_t SCREEN_W = 320;
 constexpr int16_t SCREEN_H = 240;
 constexpr int16_t TOP_MENU_HEIGHT = 32;
-constexpr int16_t BOTTOM_MENU_HEIGHT = 40;
+constexpr int16_t BOTTOM_MENU_HEIGHT = TOP_MENU_HEIGHT;  // Harmonized height for top/bottom bars
 constexpr int16_t ALERT_AREA_W = 64;
 constexpr int16_t ALERT_AREA_H = BOTTOM_MENU_HEIGHT;
 constexpr int16_t ALERT_AREA_X = SCREEN_W - ALERT_AREA_W;
@@ -29,18 +29,32 @@ enum AppState {
 };
 
 // Game view modes shared between actions and UI rendering.
+// Game view modes shared between actions and UI rendering.
 enum GameView {
-  VIEW_GAME,
+  VIEW_MAIN,
   VIEW_STATS,
-  VIEW_FEED,
-  VIEW_WORLD
+  VIEW_EAT_MENU,
+  VIEW_PLAY_MENU,
+  VIEW_WORLD_MENU,
+  VIEW_TOILET_MENU,
+  VIEW_DUEL_MENU
 };
 
 enum TopMenuId {
+  TOPMENU_NONE = -1,
   TOPMENU_STATS = 0,
-  TOPMENU_MANGER,
-  TOPMENU_JEU,
-  TOPMENU_MONDE
+  TOPMENU_EAT,
+  TOPMENU_PLAY,
+  TOPMENU_WORLD,
+  TOPMENU_COUNT
+};
+
+enum BottomMenuId {
+  BOTTOMMENU_NONE = -1,
+  BOTTOMMENU_LIGHTS = 0,
+  BOTTOMMENU_TOILET,
+  BOTTOMMENU_DUEL,
+  BOTTOMMENU_COUNT
 };
 
 // Enriched button description reused across screens.

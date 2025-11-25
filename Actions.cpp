@@ -25,11 +25,20 @@ bool lightsOff = false;
 
 // Helper to leave secondary views (like stats) when performing gameplay actions.
 static void ensureMainGameView() {
-  if (currentGameView != VIEW_GAME) {
-    currentGameView = VIEW_GAME;
+  if (currentGameView != VIEW_MAIN) {
+    currentGameView = VIEW_MAIN;
     drawGameScreenStatic();
     drawGameScreenDynamic();
   }
+}
+
+static void toggleMenuView(GameView targetView, const char* openText, const char* closeText) {
+  bool entering = currentGameView != targetView;
+  currentGameView = entering ? targetView : VIEW_MAIN;
+  if (openText && closeText) {
+    setLastAction(entering ? openText : closeText, false);
+  }
+  drawGameScreenDynamic();
 }
 
 static void copyCurrentPresetName() {
@@ -184,37 +193,28 @@ void actionToggleLights() {
   drawGameScreenDynamic();
 }
 
-void actionDuel() {
-  ensureMainGameView();
-  setLastAction("Duel (WIP)", false);
-  drawGameScreenDynamic();
-}
-
 void actionShowStats() {
-  currentGameView = (currentGameView == VIEW_STATS) ? VIEW_GAME : VIEW_STATS;
-  setLastAction(currentGameView == VIEW_STATS ? "Affichage des stats" : "Retour a la vue principale", false);
-  drawGameScreenDynamic();
+  toggleMenuView(VIEW_STATS, "Affichage des stats", "Retour a la vue principale");
 }
 
 void actionShowFeed() {
-  bool enterFeedView = currentGameView != VIEW_FEED;
-
-  // Maintain manual feeding when tapping the top menu.
-  actionEat();
-
-  currentGameView = enterFeedView ? VIEW_FEED : VIEW_GAME;
-  drawGameScreenDynamic();
+  toggleMenuView(VIEW_EAT_MENU, "Menu Manger (WIP)", "Retour a la vue principale");
 }
 
-void actionShowWorld() {
-  currentGameView = (currentGameView == VIEW_WORLD) ? VIEW_GAME : VIEW_WORLD;
-  setLastAction(currentGameView == VIEW_WORLD ? "Monde / arene (WIP)" : "Retour a la vue principale", false);
-  drawGameScreenDynamic();
+void actionShowPlayMenu() {
+  toggleMenuView(VIEW_PLAY_MENU, "Menu Jeu (WIP)", "Retour a la vue principale");
 }
 
-void actionShowGame() {
-  // Keep manual play available from the top menu while returning to the main view.
-  actionPlay();
+void actionShowWorldMenu() {
+  toggleMenuView(VIEW_WORLD_MENU, "Menu Monde (WIP)", "Retour a la vue principale");
+}
+
+void actionShowToiletMenu() {
+  toggleMenuView(VIEW_TOILET_MENU, "Menu Toilette (WIP)", "Retour a la vue principale");
+}
+
+void actionShowDuelMenu() {
+  toggleMenuView(VIEW_DUEL_MENU, "Menu Duel (WIP)", "Retour a la vue principale");
 }
 
 void chooseAndApplyAutoAction() {
