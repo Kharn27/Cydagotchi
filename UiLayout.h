@@ -34,6 +34,13 @@ enum GameView {
   VIEW_STATS
 };
 
+enum TopMenuIndex {
+  TOPMENU_STATS = 0,
+  TOPMENU_MANGER,
+  TOPMENU_JEU,
+  TOPMENU_MONDE
+};
+
 // Enriched button description reused across screens.
 typedef void (*ButtonAction)();
 
@@ -56,6 +63,7 @@ extern const size_t TOPMENU_BUTTON_COUNT;
 extern const size_t BOTTOMMENU_BUTTON_COUNT;
 
 void drawButton(const Button& b);
+void drawTopMenuButton(const Button& b, bool active);
 void drawNeedRow(const char* label, float value, int16_t x, int16_t y);
 void drawGaugeRow(const char* label, float value, int16_t x, int16_t y);
 void drawPetFace();

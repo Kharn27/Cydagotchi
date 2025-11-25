@@ -19,6 +19,18 @@ extern bool hasNewPetPersonality;
 extern char newPetName[16];
 extern bool hasNewPetName;
 
+void drawTopMenuBar() {
+  tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
+
+  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
+    bool active =
+        (i == TOPMENU_STATS && currentGameView == VIEW_STATS) ||
+        (i == TOPMENU_JEU && currentGameView == VIEW_MAIN);
+
+    drawTopMenuButton(topMenuButtons[i], active);
+  }
+}
+
 void drawTitleScreen() {
   tft.fillScreen(TFT_BLACK);
 
@@ -71,10 +83,7 @@ void drawGameScreenStatic() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
-  tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
-  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
-    drawButton(topMenuButtons[i]);
-  }
+  drawTopMenuBar();
 
   tft.fillRect(0, ALERT_AREA_Y, SCREEN_W, BOTTOM_MENU_HEIGHT, HUD_BAND_COLOR);
   for (size_t i = 0; i < BOTTOMMENU_BUTTON_COUNT; ++i) {
@@ -86,15 +95,16 @@ void drawGameScreenStatic() {
 
 void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty) {
   const int16_t headerY = TOP_MENU_HEIGHT + 4;
-  const int16_t headerH = 52;
-  const int16_t needsY = headerY + headerH + 4;
-  const int16_t needsH = ACTION_AREA_Y - needsY - 4;
+  const int16_t contentH = ACTION_AREA_Y - headerY;
 
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
+  if (headerDirty || needsDirty || faceDirty) {
+    tft.fillRect(0, headerY, SCREEN_W, contentH, TFT_BLACK);
+  }
+
   if (headerDirty) {
-    tft.fillRect(0, headerY, 210, headerH, TFT_BLACK);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.drawString(String("Nom: ") + currentPet.name, 10, headerY + 6);
     tft.drawString(String("Age: ") + String(currentPet.age, 1) + " j", 10, headerY + 20);
@@ -102,20 +112,6 @@ void drawGameViewMain(bool headerDirty, bool needsDirty, bool faceDirty) {
     tft.drawString(String("Caractere: ") + PERSONALITY_MODIFIERS[currentPet.personality].label, 10, headerY + 32);
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.drawString(String("Stade: ") + getLifeStageLabel(currentPet.lifeStage), 10, headerY + 46);
-  }
-
-  if (needsDirty) {
-    tft.fillRect(0, needsY, 210, needsH, TFT_BLACK);
-    uint16_t moodColor = currentPet.mood >= 0.7f ? TFT_GREEN : (currentPet.mood >= 0.4f ? TFT_YELLOW : TFT_RED);
-    tft.setTextColor(moodColor, TFT_BLACK);
-    drawNeedRow("Humeur", currentPet.mood, 10, needsY + 6);
-
-    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    drawNeedRow("Hunger", currentPet.hunger, 10, needsY + 18);
-    drawNeedRow("Energy", currentPet.energy, 10, needsY + 30);
-    drawNeedRow("Social", currentPet.social, 10, needsY + 42);
-    drawNeedRow("Clean", currentPet.cleanliness, 10, needsY + 54);
-    drawNeedRow("Curio", currentPet.curiosity, 10, needsY + 62);
   }
 
   if (faceDirty) {
@@ -202,6 +198,10 @@ void drawGameScreenDynamic() {
 
   bool viewChanged = !drawInitialized || cachedView != currentGameView;
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
+
+  if (viewChanged) {
+    drawTopMenuBar();
+  }
 
   if (currentGameView == VIEW_MAIN) {
     drawGameViewMain(headerDirty || viewChanged, needsDirty || viewChanged, faceDirty || viewChanged);
