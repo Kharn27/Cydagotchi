@@ -30,8 +30,10 @@ enum AppState {
 
 // Game view modes shared between actions and UI rendering.
 enum GameView {
-  VIEW_MAIN,
-  VIEW_STATS
+  VIEW_GAME,
+  VIEW_STATS,
+  VIEW_FEED,
+  VIEW_WORLD
 };
 
 enum TopMenuIndex {

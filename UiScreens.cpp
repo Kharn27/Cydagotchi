@@ -25,7 +25,9 @@ void drawTopMenuBar() {
   for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
     bool active =
         (i == TOPMENU_STATS && currentGameView == VIEW_STATS) ||
-        (i == TOPMENU_JEU && currentGameView == VIEW_MAIN);
+        (i == TOPMENU_MANGER && currentGameView == VIEW_FEED) ||
+        (i == TOPMENU_JEU && currentGameView == VIEW_GAME) ||
+        (i == TOPMENU_MONDE && currentGameView == VIEW_WORLD);
 
     drawTopMenuButton(topMenuButtons[i], active);
   }
@@ -172,12 +174,44 @@ void drawGameViewStats(bool statsDirty) {
   drawGaugeRow("Curio",  currentPet.curiosity,    10, tableY + rowHeight * 5);
 }
 
+void drawGameViewFeed(bool dirty) {
+  if (!dirty) return;
+
+  const int16_t contentY = TOP_MENU_HEIGHT;
+  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
+  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.setTextFont(4);
+  tft.drawString("Manger (WIP)", SCREEN_W / 2, contentY + contentH / 2 - 12);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.drawString("Choisis un repas bientot", SCREEN_W / 2, contentY + contentH / 2 + 12);
+}
+
+void drawGameViewWorld(bool dirty) {
+  if (!dirty) return;
+
+  const int16_t contentY = TOP_MENU_HEIGHT;
+  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
+  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
+  tft.setTextFont(4);
+  tft.drawString("Monde / arene", SCREEN_W / 2, contentY + contentH / 2 - 12);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.drawString("Aventure en preparation", SCREEN_W / 2, contentY + contentH / 2 + 12);
+}
+
 void drawGameScreenDynamic() {
   static Pet cachedPet = {};
   static bool drawInitialized = false;
   static char cachedAction[sizeof(lastActionText)] = "";
   static bool cachedActionAuto = false;
-  static GameView cachedView = VIEW_MAIN;
+  static GameView cachedView = VIEW_GAME;
 
   auto valueChanged = [](float a, float b, float epsilon) {
     return fabsf(a - b) >= epsilon;
@@ -211,11 +245,17 @@ void drawGameScreenDynamic() {
     tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
   }
 
-  if (currentGameView == VIEW_MAIN) {
+  if (currentGameView == VIEW_GAME) {
     drawGameViewMain(headerDirty, faceDirty, viewChanged);
-  } else {
+  } else if (currentGameView == VIEW_STATS) {
     bool statsDirty = headerDirty || needsDirty || faceDirty || viewChanged;
     drawGameViewStats(statsDirty);
+  } else if (currentGameView == VIEW_FEED) {
+    bool feedDirty = viewChanged;
+    drawGameViewFeed(feedDirty);
+  } else if (currentGameView == VIEW_WORLD) {
+    bool worldDirty = viewChanged;
+    drawGameViewWorld(worldDirty);
   }
 
   if (actionDirty || viewChanged) {

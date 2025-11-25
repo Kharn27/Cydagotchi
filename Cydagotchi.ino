@@ -52,9 +52,9 @@ Button newPetButtons[] = {
 const int16_t topMenuButtonWidth = SCREEN_W / (TOPMENU_MONDE + 1);
 Button topMenuButtons[] = {
   { topMenuButtonWidth * TOPMENU_STATS, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats },
-  { topMenuButtonWidth * TOPMENU_MANGER, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionEat },
-  { topMenuButtonWidth * TOPMENU_JEU, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionPlay },
-  { topMenuButtonWidth * TOPMENU_MONDE, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionStubWorld }
+  { topMenuButtonWidth * TOPMENU_MANGER, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed },
+  { topMenuButtonWidth * TOPMENU_JEU, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionShowGame },
+  { topMenuButtonWidth * TOPMENU_MONDE, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionShowWorld }
 };
 
 static_assert(TOPMENU_MONDE + 1 == (sizeof(topMenuButtons) / sizeof(topMenuButtons[0])),
@@ -97,7 +97,7 @@ void changeScene(AppState next) {
       drawNewPetScreen();
       break;
     case STATE_GAME:
-      currentGameView = VIEW_MAIN;
+      currentGameView = VIEW_GAME;
       if (!petInitialized) {
         if (hasNewPetPersonality && hasNewPetName) {
           initPetWithPersonality(newPetPersonality, newPetName);
