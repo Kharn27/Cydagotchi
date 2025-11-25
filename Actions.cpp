@@ -25,8 +25,8 @@ bool lightsOff = false;
 
 // Helper to leave secondary views (like stats) when performing gameplay actions.
 static void ensureMainGameView() {
-  if (currentGameView != VIEW_MAIN) {
-    currentGameView = VIEW_MAIN;
+  if (currentGameView != VIEW_GAME) {
+    currentGameView = VIEW_GAME;
     drawGameScreenStatic();
     drawGameScreenDynamic();
   }
@@ -191,15 +191,29 @@ void actionDuel() {
 }
 
 void actionShowStats() {
-  currentGameView = (currentGameView == VIEW_MAIN) ? VIEW_STATS : VIEW_MAIN;
+  currentGameView = (currentGameView == VIEW_STATS) ? VIEW_GAME : VIEW_STATS;
   setLastAction(currentGameView == VIEW_STATS ? "Affichage des stats" : "Retour a la vue principale", false);
   drawGameScreenDynamic();
 }
 
-void actionStubWorld() {
-  ensureMainGameView();
-  setLastAction("Monde / arene (WIP)", false);
+void actionShowFeed() {
+  currentGameView = (currentGameView == VIEW_FEED) ? VIEW_GAME : VIEW_FEED;
+  setLastAction(currentGameView == VIEW_FEED ? "Ecran Manger" : "Retour a la vue principale", false);
   drawGameScreenDynamic();
+}
+
+void actionShowWorld() {
+  currentGameView = (currentGameView == VIEW_WORLD) ? VIEW_GAME : VIEW_WORLD;
+  setLastAction(currentGameView == VIEW_WORLD ? "Monde / arene (WIP)" : "Retour a la vue principale", false);
+  drawGameScreenDynamic();
+}
+
+void actionShowGame() {
+  if (currentGameView != VIEW_GAME) {
+    currentGameView = VIEW_GAME;
+    setLastAction("Retour a la vue principale", false);
+    drawGameScreenDynamic();
+  }
 }
 
 void chooseAndApplyAutoAction() {
