@@ -51,10 +51,10 @@ Button newPetButtons[] = {
 
 const int16_t topMenuButtonWidth = SCREEN_W / (TOPMENU_MONDE + 1);
 Button topMenuButtons[] = {
-  { topMenuButtonWidth * TOPMENU_STATS, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats },
-  { topMenuButtonWidth * TOPMENU_MANGER, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed },
-  { topMenuButtonWidth * TOPMENU_JEU, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionShowGame },
-  { topMenuButtonWidth * TOPMENU_MONDE, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionShowWorld }
+  { topMenuButtonWidth * TOPMENU_STATS, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats, TOPMENU_STATS },
+  { topMenuButtonWidth * TOPMENU_MANGER, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed, TOPMENU_MANGER },
+  { topMenuButtonWidth * TOPMENU_JEU, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Jeu", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionShowGame, TOPMENU_JEU },
+  { topMenuButtonWidth * TOPMENU_MONDE, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Monde", TFT_MAGENTA, TFT_WHITE, HUD_BORDER_COLOR, actionShowWorld, TOPMENU_MONDE }
 };
 
 static_assert(TOPMENU_MONDE + 1 == (sizeof(topMenuButtons) / sizeof(topMenuButtons[0])),

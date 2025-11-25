@@ -25,19 +25,31 @@ void clearGameContentArea() {
   const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
   tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 }
+
+TopMenuId activeTopMenuForView(GameView view) {
+  switch (view) {
+    case VIEW_STATS: return TOPMENU_STATS;
+    case VIEW_FEED: return TOPMENU_MANGER;
+    case VIEW_WORLD: return TOPMENU_MONDE;
+    case VIEW_GAME:
+    default: return TOPMENU_JEU;
+  }
+}
+
+bool showCloseIndicatorForView(GameView view) {
+  return view != VIEW_GAME;
+}
 }  // namespace
 
 void drawTopMenuBar() {
   tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
 
-  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
-    bool active =
-        (i == TOPMENU_STATS && currentGameView == VIEW_STATS) ||
-        (i == TOPMENU_MANGER && currentGameView == VIEW_FEED) ||
-        (i == TOPMENU_JEU && currentGameView == VIEW_GAME) ||
-        (i == TOPMENU_MONDE && currentGameView == VIEW_WORLD);
+  TopMenuId activeId = activeTopMenuForView(currentGameView);
+  bool showCloseIndicator = showCloseIndicatorForView(currentGameView);
 
-    drawTopMenuButton(topMenuButtons[i], active);
+  for (size_t i = 0; i < TOPMENU_BUTTON_COUNT; ++i) {
+    bool active = topMenuButtons[i].id == activeId;
+    drawTopMenuButton(topMenuButtons[i], active, active && showCloseIndicator);
   }
 }
 
@@ -250,8 +262,14 @@ void drawGameScreenDynamic() {
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
   if (viewChanged) {
+    // When switching views, rebuild the top bar, clear the content zone, and force a full redraw
+    // so the first frame of the Stats panel is properly aligned (no delayed resync).
     drawTopMenuBar();
     clearGameContentArea();
+    headerDirty = true;
+    needsDirty = true;
+    faceDirty = true;
+    actionDirty = true;
     tft.setTextDatum(TL_DATUM);
     tft.setTextFont(2);
   }
