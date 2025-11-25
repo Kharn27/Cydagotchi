@@ -33,17 +33,14 @@ void drawButton(const Button& b) {
 }
 
 void drawTopMenuButton(const Button& b, bool active, bool showCloseIndicator) {
+  (void)showCloseIndicator;
   Button styled = b;
-  const char* displayLabel = b.label;
   if (active) {
     styled.fillColor = lightenColor(b.fillColor);
     styled.borderColor = TFT_WHITE;
-    if (showCloseIndicator) {
-      displayLabel = "[X]";
-    }
+    styled.textColor = TFT_WHITE;
   }
 
-  styled.label = displayLabel;
   drawButton(styled);
 }
 

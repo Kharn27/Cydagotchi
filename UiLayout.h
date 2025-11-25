@@ -8,6 +8,7 @@
 constexpr int16_t SCREEN_W = 320;
 constexpr int16_t SCREEN_H = 240;
 constexpr int16_t TOP_MENU_HEIGHT = 32;
+constexpr int16_t TOP_CLOCK_AREA_W = 64;
 constexpr int16_t BOTTOM_MENU_HEIGHT = TOP_MENU_HEIGHT;  // Harmonized height for top/bottom bars
 constexpr int16_t ALERT_AREA_W = 64;
 constexpr int16_t ALERT_AREA_H = BOTTOM_MENU_HEIGHT;
@@ -78,6 +79,9 @@ extern const size_t MENU_BUTTON_COUNT;
 extern const size_t NEWPET_BUTTON_COUNT;
 extern const size_t TOPMENU_BUTTON_COUNT;
 extern const size_t BOTTOMMENU_BUTTON_COUNT;
+extern const size_t FEED_MENU_BUTTON_COUNT;
+extern const size_t PLAY_MENU_BUTTON_COUNT;
+extern const size_t TOILET_MENU_BUTTON_COUNT;
 
 void drawButton(const Button& b);
 void drawTopMenuButton(const Button& b, bool active, bool showCloseIndicator);

@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <cstring>
 #include <cmath>
+#include <FS.h>
+#include <SPIFFS.h>
+#include <PNGdec.h>
 #include "UiScreens.h"
 #include "Actions.h"
 #include "GameState.h"
@@ -9,10 +12,16 @@ extern Button menuButtons[];
 extern Button newPetButtons[];
 extern Button topMenuButtons[];
 extern Button bottomMenuButtons[];
+extern Button feedMenuButtons[];
+extern Button playMenuButtons[];
+extern Button toiletMenuButtons[];
 extern const size_t MENU_BUTTON_COUNT;
 extern const size_t NEWPET_BUTTON_COUNT;
 extern const size_t TOPMENU_BUTTON_COUNT;
 extern const size_t BOTTOMMENU_BUTTON_COUNT;
+extern const size_t FEED_MENU_BUTTON_COUNT;
+extern const size_t PLAY_MENU_BUTTON_COUNT;
+extern const size_t TOILET_MENU_BUTTON_COUNT;
 
 extern PersonalityType newPetPersonality;
 extern bool hasNewPetPersonality;
@@ -20,14 +29,137 @@ extern char newPetName[16];
 extern bool hasNewPetName;
 
 namespace {
-void clearGameContentArea() {
-  const int16_t contentY = TOP_MENU_HEIGHT;
-  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
-  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+PNG png;
+File pngFile;
+
+struct BackgroundDrawContext {
+  int frameIndex = 0;
+  int frameHeight = 0;
+};
+
+BackgroundDrawContext backgroundContext;
+
+enum TimeOfDaySlot { SLOT_NIGHT = 0, SLOT_DAWN = 1, SLOT_DAY = 2 };
+
+const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet observed at 3 frames vertically
+constexpr int BACKGROUND_FRAME_COUNT = 3;
+
+TimeOfDaySlot slotForTime(int hours, int minutes) {
+  int totalMinutes = hours * 60 + minutes;
+  int nightStart = 21 * 60 + 30;
+  int dawnStart = 6 * 60 + 30;
+  int dayStart = 8 * 60 + 30;
+
+  if (totalMinutes >= nightStart || totalMinutes < dawnStart) return SLOT_NIGHT;
+  if (totalMinutes < dayStart) return SLOT_DAWN;
+  return SLOT_DAY;
+}
+
+int frameForSlot(TimeOfDaySlot slot) {
+  switch (slot) {
+    case SLOT_NIGHT: return 0;
+    case SLOT_DAWN: return 1;
+    case SLOT_DAY: return 2;
+  }
+  return 0;
+}
+
+void* pngOpen(const char* filename, int32_t* size) {
+  pngFile = SPIFFS.open(filename, "r");
+  if (!pngFile || pngFile.isDirectory()) {
+    return nullptr;
+  }
+  *size = pngFile.size();
+  return &pngFile;
+}
+
+void pngClose(void* handle) {
+  File* f = static_cast<File*>(handle);
+  if (f) f->close();
+}
+
+int32_t pngRead(PNGFILE* file, uint8_t* buffer, int32_t length) {
+  File* f = static_cast<File*>(file->fHandle);
+  return f->read(buffer, length);
+}
+
+int32_t pngSeek(PNGFILE* file, int32_t position) {
+  File* f = static_cast<File*>(file->fHandle);
+  f->seek(position);
+  return position;
+}
+
+void pngBackgroundDraw(PNGDRAW* pDraw) {
+  if (backgroundContext.frameHeight <= 0) return;
+
+  int frameTop = backgroundContext.frameIndex * backgroundContext.frameHeight;
+  int frameBottom = frameTop + backgroundContext.frameHeight;
+  if (pDraw->y < frameTop || pDraw->y >= frameBottom) return;
+
+  static uint16_t sourceLine[SCREEN_W];
+  static uint16_t scaledLine[SCREEN_W];
+
+  png.getLineAsRGB565(pDraw, sourceLine, PNG_RGB565_BIG_ENDIAN, 0xFFFFFFFF);
+
+  int frameY = pDraw->y - frameTop;
+  int destYStart = (frameY * SCREEN_H) / backgroundContext.frameHeight;
+  int destYEnd = ((frameY + 1) * SCREEN_H) / backgroundContext.frameHeight;
+  int destLines = destYEnd - destYStart;
+  if (destLines <= 0) destLines = 1;
+
+  for (int x = 0; x < SCREEN_W; ++x) {
+    int srcX = (x * pDraw->iWidth) / SCREEN_W;
+    scaledLine[x] = sourceLine[srcX];
+  }
+
+  for (int dy = 0; dy < destLines && destYStart + dy < SCREEN_H; ++dy) {
+    tft.pushImage(0, destYStart + dy, SCREEN_W, 1, scaledLine);
+  }
+}
+
+bool drawBackgroundFrame(int frameIndex) {
+  int16_t rc = png.open(BACKGROUND_IMAGE_PATH, pngOpen, pngClose, pngRead, pngSeek, pngBackgroundDraw);
+  if (rc != PNG_SUCCESS) {
+    Serial.printf("[Background] Unable to open %s (err=%d)\n", BACKGROUND_IMAGE_PATH, rc);
+    return false;
+  }
+
+  int imageHeight = png.getHeight();
+  backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
+  backgroundContext.frameIndex = frameIndex;
+
+  tft.setSwapBytes(true);
+  png.decode(nullptr, 0);
+  png.close();
+  return true;
+}
+
+bool drawBackgroundForCurrentTime(bool forceRedraw) {
+  static bool backgroundDrawn = false;
+  static TimeOfDaySlot lastSlot = SLOT_NIGHT;
+
+  int hours = 0;
+  int minutes = 0;
+  getGameTime(hours, minutes);
+  TimeOfDaySlot slot = slotForTime(hours, minutes);
+
+  if (!forceRedraw && backgroundDrawn && slot == lastSlot) {
+    return false;
+  }
+
+  bool ok = drawBackgroundFrame(frameForSlot(slot));
+  if (!ok) {
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  lastSlot = slot;
+  backgroundDrawn = true;
+  return true;
 }
 
 TopMenuId activeTopMenuForView(GameView view) {
   switch (view) {
+    case VIEW_MAIN: return TOPMENU_PLAY;
     case VIEW_STATS: return TOPMENU_STATS;
     case VIEW_EAT_MENU: return TOPMENU_EAT;
     case VIEW_PLAY_MENU: return TOPMENU_PLAY;
@@ -53,23 +185,30 @@ void drawMenuButton(const Button& b, bool active, bool showCloseIndicator) {
   drawTopMenuButton(b, active, showCloseIndicator);
 }
 
-void drawSimpleWipView(const char* title, const char* subtitle) {
+void drawWipViewWithButtons(const char* title, const char* subtitle, Button* buttons, size_t count) {
   const int16_t contentY = TOP_MENU_HEIGHT;
-  const int16_t contentH = ACTION_AREA_Y - TOP_MENU_HEIGHT;
-  tft.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  tft.fillRoundRect(8, contentY + 6, SCREEN_W - 16, 52, 8, TFT_BLACK);
 
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(4);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString(title, SCREEN_W / 2, contentY + contentH / 2 - 12);
+  tft.drawString(title, SCREEN_W / 2, contentY + 28);
   tft.setTextFont(2);
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft.drawString(subtitle, SCREEN_W / 2, contentY + contentH / 2 + 12);
+  tft.drawString(subtitle, SCREEN_W / 2, contentY + 48);
+
+  if (buttons) {
+    for (size_t i = 0; i < count; ++i) {
+      drawButton(buttons[i]);
+    }
+  }
 }
 }  // namespace
 
 void drawTopMenuBar() {
   tft.fillRect(0, 0, SCREEN_W, TOP_MENU_HEIGHT, HUD_BAND_COLOR);
+  tft.drawRect(SCREEN_W - TOP_CLOCK_AREA_W, 0, TOP_CLOCK_AREA_W, TOP_MENU_HEIGHT, HUD_BORDER_COLOR);
 
   TopMenuId activeId = activeTopMenuForView(currentGameView);
   bool showCloseIndicator = viewHasCloseIndicator(currentGameView);
@@ -140,7 +279,7 @@ void drawNewPetScreen() {
 }
 
 void drawGameScreenStatic() {
-  tft.fillScreen(TFT_BLACK);
+  drawBackgroundForCurrentTime(true);
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(2);
 
@@ -161,7 +300,8 @@ void drawGameViewMain(bool headerDirty, bool faceDirty, bool forceClear) {
 
   bool clearAll = forceClear || headerDirty;
   if (clearAll) {
-    tft.fillRect(0, headerY, SCREEN_W, contentH, TFT_BLACK);
+    tft.fillRect(0, headerY, SCREEN_W / 2 + 60, contentH, TFT_BLACK);
+    tft.fillRect(SCREEN_W - 130, headerY, 122, 90, TFT_BLACK);
     headerDirty = true;
     faceDirty = true;
   }
@@ -177,7 +317,7 @@ void drawGameViewMain(bool headerDirty, bool faceDirty, bool forceClear) {
   }
 
   if (faceDirty) {
-    tft.fillRect(SCREEN_W - 120, headerY, 100, 80, TFT_BLACK);
+    tft.fillRect(SCREEN_W - 130, headerY, 122, 90, TFT_BLACK);
     drawPetFace();
   }
 }
@@ -236,27 +376,27 @@ void drawGameViewStats(bool statsDirty) {
 
 void drawGameViewEatMenu(bool dirty) {
   if (!dirty) return;
-  drawSimpleWipView("Manger (WIP)", "Choisis un repas bientot");
+  drawWipViewWithButtons("Manger (WIP)", "Choisis un repas bientot", feedMenuButtons, FEED_MENU_BUTTON_COUNT);
 }
 
 void drawGameViewPlayMenu(bool dirty) {
   if (!dirty) return;
-  drawSimpleWipView("Menu Jeu (WIP)", "Mini-jeux a venir");
+  drawWipViewWithButtons("Menu Jeu (WIP)", "Mini-jeux a venir", playMenuButtons, PLAY_MENU_BUTTON_COUNT);
 }
 
 void drawGameViewWorldMenu(bool dirty) {
   if (!dirty) return;
-  drawSimpleWipView("Menu Monde (WIP)", "Aventure en preparation");
+  drawWipViewWithButtons("Menu Monde (WIP)", "Aventure en preparation", nullptr, 0);
 }
 
 void drawGameViewToiletMenu(bool dirty) {
   if (!dirty) return;
-  drawSimpleWipView("Menu Toilette (WIP)", "Un petit nettoyage arrive");
+  drawWipViewWithButtons("Menu Toilette (WIP)", "Un petit nettoyage arrive", toiletMenuButtons, TOILET_MENU_BUTTON_COUNT);
 }
 
 void drawGameViewDuelMenu(bool dirty) {
   if (!dirty) return;
-  drawSimpleWipView("Menu Duel (WIP)", "Mode versus en cours");
+  drawWipViewWithButtons("Menu Duel (WIP)", "Mode versus en cours", nullptr, 0);
 }
 
 void drawGameClock(bool force) {
@@ -274,12 +414,12 @@ void drawGameClock(bool force) {
   lastHour = hours;
   lastMinute = minutes;
 
-  const int16_t clockW = 64;
-  const int16_t clockH = 18;
-  const int16_t x = SCREEN_W - clockW - 6;
-  const int16_t y = TOP_MENU_HEIGHT + 90;
+  const int16_t clockW = TOP_CLOCK_AREA_W - 8;
+  const int16_t clockH = TOP_MENU_HEIGHT - 6;
+  const int16_t x = SCREEN_W - TOP_CLOCK_AREA_W + 4;
+  const int16_t y = 3;
 
-  tft.fillRect(x, y, clockW, clockH, TFT_BLACK);
+  tft.fillRect(x, y, clockW, clockH, HUD_BAND_COLOR);
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(2);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -304,6 +444,8 @@ void drawGameScreenDynamic() {
   tft.setTextFont(2);
 
   bool viewChanged = !drawInitialized || cachedView != currentGameView;
+  bool backgroundUpdated = drawBackgroundForCurrentTime(viewChanged);
+  bool navChanged = viewChanged || backgroundUpdated;
 
   bool headerDirty = !drawInitialized || viewChanged ||
                      strncmp(cachedPet.name, currentPet.name, sizeof(currentPet.name)) != 0 ||
@@ -321,12 +463,19 @@ void drawGameScreenDynamic() {
 
   bool alertDirty = !drawInitialized || needsDirty || viewChanged;
 
-  if (viewChanged) {
+  if (backgroundUpdated) {
+    headerDirty = true;
+    needsDirty = true;
+    faceDirty = true;
+    actionDirty = true;
+    alertDirty = true;
+  }
+
+  if (navChanged) {
     // When switching views, rebuild the top bar, clear the content zone, and force a full redraw
     // so the first frame of the Stats panel is properly aligned (no delayed resync).
     drawTopMenuBar();
     drawBottomMenuBar();
-    clearGameContentArea();
     headerDirty = true;
     needsDirty = true;
     faceDirty = true;
@@ -357,7 +506,7 @@ void drawGameScreenDynamic() {
     drawGameViewDuelMenu(duelDirty);
   }
 
-  drawGameClock(viewChanged);
+  drawGameClock(navChanged);
 
   if (actionDirty || viewChanged) {
     tft.setTextDatum(TL_DATUM);

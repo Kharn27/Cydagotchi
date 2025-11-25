@@ -4,6 +4,7 @@
 #include <TFT_eSPI.h>
 // #include <XPT2046_Touchscreen.h>
 #include <XPT2046_Touchscreen_TT.h>
+#include <SPIFFS.h>
 
 #include "PetModel.h"
 #include "PetLogic.h"
@@ -49,7 +50,7 @@ Button newPetButtons[] = {
   { 70, 210, 180, 30, "Demarrer le jeu", TFT_GREEN, TFT_WHITE, TFT_WHITE, actionStartGameFromNewPet }
 };
 
-const int16_t topMenuButtonWidth = SCREEN_W / TOPMENU_COUNT;
+const int16_t topMenuButtonWidth = (SCREEN_W - TOP_CLOCK_AREA_W) / TOPMENU_COUNT;
 Button topMenuButtons[] = {
   { topMenuButtonWidth * TOPMENU_STATS, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Stats", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionShowStats, TOPMENU_STATS },
   { topMenuButtonWidth * TOPMENU_EAT, 0, topMenuButtonWidth, TOP_MENU_HEIGHT, "Manger", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionShowFeed, TOPMENU_EAT },
@@ -71,6 +72,26 @@ extern const size_t MENU_BUTTON_COUNT       = sizeof(menuButtons) / sizeof(menuB
 extern const size_t NEWPET_BUTTON_COUNT     = sizeof(newPetButtons) / sizeof(newPetButtons[0]);
 extern const size_t TOPMENU_BUTTON_COUNT    = TOPMENU_COUNT;
 extern const size_t BOTTOMMENU_BUTTON_COUNT = sizeof(bottomMenuButtons) / sizeof(bottomMenuButtons[0]);
+extern const size_t FEED_MENU_BUTTON_COUNT  = 3;
+extern const size_t PLAY_MENU_BUTTON_COUNT  = 3;
+extern const size_t TOILET_MENU_BUTTON_COUNT = 2;
+
+Button feedMenuButtons[FEED_MENU_BUTTON_COUNT] = {
+  { 16, TOP_MENU_HEIGHT + 70, 130, 36, "Croquette", TFT_DARKGREEN, TFT_WHITE, HUD_BORDER_COLOR, actionEat },
+  { SCREEN_W - 146, TOP_MENU_HEIGHT + 70, 130, 36, "Snack", TFT_GREEN, TFT_WHITE, HUD_BORDER_COLOR, actionEat },
+  { 16, TOP_MENU_HEIGHT + 112, 260, 36, "Repas complet", TFT_DARKGREY, TFT_WHITE, HUD_BORDER_COLOR, actionEat }
+};
+
+Button playMenuButtons[PLAY_MENU_BUTTON_COUNT] = {
+  { 16, TOP_MENU_HEIGHT + 70, 130, 36, "Balle", TFT_BLUE, TFT_WHITE, HUD_BORDER_COLOR, actionPlay },
+  { SCREEN_W - 146, TOP_MENU_HEIGHT + 70, 130, 36, "Console", TFT_NAVY, TFT_WHITE, HUD_BORDER_COLOR, actionPlay },
+  { 16, TOP_MENU_HEIGHT + 112, 260, 36, "Mini-jeu", TFT_DARKCYAN, TFT_WHITE, HUD_BORDER_COLOR, actionPlay }
+};
+
+Button toiletMenuButtons[TOILET_MENU_BUTTON_COUNT] = {
+  { 16, TOP_MENU_HEIGHT + 70, 130, 36, "Douche", TFT_CYAN, TFT_BLACK, HUD_BORDER_COLOR, actionWash },
+  { SCREEN_W - 146, TOP_MENU_HEIGHT + 70, 130, 36, "Peigne", TFT_LIGHTGREY, TFT_BLACK, HUD_BORDER_COLOR, actionWash }
+};
 
 void changeScene(AppState next) {
   appState = next;
@@ -111,7 +132,7 @@ void changeScene(AppState next) {
         setLastAction(birthMsg, false);
       }
       lastGameTickMillis = millis();
-      gameClockStartMillis = lastGameTickMillis;
+      resetGameClock();
       lastAutoActionMillis = lastGameTickMillis;
       lastRedrawMillis = lastGameTickMillis;
       lastAutoSaveMillis = lastGameTickMillis;
@@ -125,6 +146,10 @@ void setup() {
   Serial.begin(115200);
 
   petStorageBegin();
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[FS] SPIFFS mount failed");
+  }
 
   randomSeed(analogRead(34));
 
