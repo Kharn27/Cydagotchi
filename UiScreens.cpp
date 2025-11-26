@@ -45,8 +45,7 @@ struct BackgroundDrawContext {
 
 BackgroundDrawContext backgroundContext;
 
-constexpr int BACKGROUND_TILE_WIDTH = 104;
-constexpr int BACKGROUND_TILE_HEIGHT = 100;
+constexpr int BACKGROUND_TILE_WIDTH = 104;   // largeur logique d'une tuile (unused pour l'instant)
 constexpr int BACKGROUND_TILE_SEPARATOR = 2;
 constexpr int BACKGROUND_SELECTED_FRAME = 2;  // 0-based -> 3rd tile
 const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet with 5 vertical frames
@@ -108,8 +107,9 @@ int32_t pngSeek(PNGFILE* file, int32_t position) {
 int pngBackgroundDraw(PNGDRAW* pDraw) {
   if (backgroundContext.frameHeight <= 0) return 1;
 
-  int frameTop = backgroundContext.frameIndex * (BACKGROUND_TILE_HEIGHT + BACKGROUND_TILE_SEPARATOR);
-  int frameBottom = frameTop + BACKGROUND_TILE_HEIGHT;
+  // Découpage vertical basé sur la hauteur calculée dynamiquement
+  int frameTop = backgroundContext.frameIndex * (backgroundContext.frameHeight + BACKGROUND_TILE_SEPARATOR);
+  int frameBottom = frameTop + backgroundContext.frameHeight;
   if (pDraw->y < frameTop || pDraw->y >= frameBottom) return 1;
 
   int frameWidth = pDraw->iWidth;
@@ -121,8 +121,9 @@ int pngBackgroundDraw(PNGDRAW* pDraw) {
   png.getLineAsRGB565(pDraw, sourceLine, PNG_RGB565_BIG_ENDIAN, 0xFFFFFFFF);
 
   int frameY = pDraw->y - frameTop;
-  int destYStart = (frameY * SCREEN_H) / BACKGROUND_TILE_HEIGHT;
-  int destYEnd = ((frameY + 1) * SCREEN_H) / BACKGROUND_TILE_HEIGHT;
+  // Mapping vertical : on étire une tuile (frameHeight) sur toute la hauteur de l'écran
+  int destYStart = (frameY * SCREEN_H) / backgroundContext.frameHeight;
+  int destYEnd = ((frameY + 1) * SCREEN_H) / backgroundContext.frameHeight;
   if (destYStart >= SCREEN_H) return 1;
   if (destYEnd > SCREEN_H) destYEnd = SCREEN_H;
   int destLines = destYEnd - destYStart;
@@ -146,15 +147,28 @@ bool drawBackgroundFrame(int frameIndex) {
     return false;
   }
 
+  // On dérive la hauteur de tuile de la hauteur réelle de l'image :
+  // imageHeight = tileHeight * N + separator * (N-1)
+  int imageHeight = png.getHeight();
   backgroundContext.frameCount = BACKGROUND_FRAME_COUNT;
-  backgroundContext.frameHeight = BACKGROUND_TILE_HEIGHT;
+
+  int usableHeight = imageHeight - BACKGROUND_TILE_SEPARATOR * (BACKGROUND_FRAME_COUNT - 1);
+  if (usableHeight <= 0) {
+    png.close();
+    return false;
+  }
+  backgroundContext.frameHeight = usableHeight / BACKGROUND_FRAME_COUNT;
+  if (backgroundContext.frameHeight <= 0) {
+    png.close();
+    return false;
+  }
   if (frameIndex < 0) frameIndex = 0;
   if (frameIndex >= backgroundContext.frameCount) frameIndex = backgroundContext.frameCount - 1;
   backgroundContext.frameIndex = frameIndex;
 
 #if DEBUG_BACKGROUND
-  Serial.printf("[Background] Decoding frame %d from %s (frameH=%d)\n", frameIndex, BACKGROUND_IMAGE_PATH,
-                backgroundContext.frameHeight);
+  Serial.printf("[Background] Decoding frame %d from %s (imageH=%d, frameH=%d)\n",
+                frameIndex, BACKGROUND_IMAGE_PATH, imageHeight, backgroundContext.frameHeight);
 #endif
 
   tft.setSwapBytes(true);
@@ -173,7 +187,7 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   }
 
   redrawn = true;
-  constexpr int DEFAULT_FRAME_INDEX = BACKGROUND_SELECTED_FRAME;
+  constexpr int DEFAULT_FRAME_INDEX = BACKGROUND_SELECTED_FRAME; // pour l'instant : on affiche toujours la 3e tuile
   int targetFrame = DEFAULT_FRAME_INDEX;
   bool ok = drawBackgroundFrame(targetFrame);
   if (!ok) {
