@@ -45,8 +45,8 @@ struct BackgroundDrawContext {
 
 BackgroundDrawContext backgroundContext;
 
-const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet observed at 3 frames vertically
-constexpr int BACKGROUND_FRAME_COUNT = 3;                   // 3 stacked tiles (104x171 each)
+const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet with 5 vertical frames
+constexpr int BACKGROUND_FRAME_COUNT = 5;                   // 5 stacked tiles (104px wide)
 constexpr int BACKGROUND_MAX_SOURCE_WIDTH = 128;            // frames are 104 px wide, keep guard room
 
 Pet cachedPet = {};
@@ -65,8 +65,10 @@ int frameForSlot(TimeOfDaySlot slot, int availableFrames) {
     case SLOT_NIGHT: preferred = 0; break;
     case SLOT_DAWN: preferred = 1; break;
     case SLOT_DAY: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
-    case SLOT_EVENING: preferred = availableFrames >= 3 ? 2 : availableFrames - 1; break;
-    case SLOT_STORM: preferred = 0; break;
+    case SLOT_EVENING:
+      preferred = availableFrames >= 4 ? 3 : (availableFrames >= 3 ? 2 : availableFrames - 1);
+      break;
+    case SLOT_STORM: preferred = availableFrames >= 5 ? 4 : 0; break;
     default: preferred = 0; break;
   }
 
@@ -117,6 +119,8 @@ int pngBackgroundDraw(PNGDRAW* pDraw) {
   int frameY = pDraw->y - frameTop;
   int destYStart = (frameY * SCREEN_H) / backgroundContext.frameHeight;
   int destYEnd = ((frameY + 1) * SCREEN_H) / backgroundContext.frameHeight;
+  if (destYStart >= SCREEN_H) return 1;
+  if (destYEnd > SCREEN_H) destYEnd = SCREEN_H;
   int destLines = destYEnd - destYStart;
   if (destLines <= 0) destLines = 1;
 
@@ -141,6 +145,12 @@ bool drawBackgroundFrame(int frameIndex) {
   int imageHeight = png.getHeight();
   backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
   backgroundContext.frameCount = BACKGROUND_FRAME_COUNT;
+  if (backgroundContext.frameHeight <= 0) {
+    png.close();
+    return false;
+  }
+  if (frameIndex < 0) frameIndex = 0;
+  if (frameIndex >= backgroundContext.frameCount) frameIndex = backgroundContext.frameCount - 1;
   backgroundContext.frameIndex = frameIndex;
 
 #if DEBUG_BACKGROUND
@@ -490,11 +500,9 @@ void drawGameScreenDynamic() {
   bool backgroundOk = drawBackgroundForCurrentTime(viewChanged, backgroundRedrawn);
   bool navNeedsRedraw = viewChanged || backgroundRedrawn;
 
-  // If the background failed to draw or hasn't been refreshed for this view change,
-  // clear the content zone once to avoid remnants.
-  if (!backgroundOk) {
-    clearContentArea();
-  } else if (viewChanged && !backgroundRedrawn) {
+  // Background drawing is our primary clear; only wipe the content area as a fallback
+  // when the background is missing or we changed view without refreshing it.
+  if (!backgroundOk || (viewChanged && !backgroundRedrawn)) {
     clearContentArea();
   }
 
