@@ -45,6 +45,10 @@ struct BackgroundDrawContext {
 
 BackgroundDrawContext backgroundContext;
 
+constexpr int BACKGROUND_TILE_WIDTH = 104;
+constexpr int BACKGROUND_TILE_HEIGHT = 100;
+constexpr int BACKGROUND_TILE_SEPARATOR = 2;
+constexpr int BACKGROUND_SELECTED_FRAME = 2;  // 0-based -> 3rd tile
 const char* BACKGROUND_IMAGE_PATH = "/img/egg0Back.png";  // sprite sheet with 5 vertical frames
 constexpr int BACKGROUND_FRAME_COUNT = 5;                   // 5 stacked tiles (104px wide)
 constexpr int BACKGROUND_MAX_SOURCE_WIDTH = 128;            // frames are 104 px wide, keep guard room
@@ -104,8 +108,8 @@ int32_t pngSeek(PNGFILE* file, int32_t position) {
 int pngBackgroundDraw(PNGDRAW* pDraw) {
   if (backgroundContext.frameHeight <= 0) return 1;
 
-  int frameTop = backgroundContext.frameIndex * backgroundContext.frameHeight;
-  int frameBottom = frameTop + backgroundContext.frameHeight;
+  int frameTop = backgroundContext.frameIndex * (BACKGROUND_TILE_HEIGHT + BACKGROUND_TILE_SEPARATOR);
+  int frameBottom = frameTop + BACKGROUND_TILE_HEIGHT;
   if (pDraw->y < frameTop || pDraw->y >= frameBottom) return 1;
 
   int frameWidth = pDraw->iWidth;
@@ -117,8 +121,8 @@ int pngBackgroundDraw(PNGDRAW* pDraw) {
   png.getLineAsRGB565(pDraw, sourceLine, PNG_RGB565_BIG_ENDIAN, 0xFFFFFFFF);
 
   int frameY = pDraw->y - frameTop;
-  int destYStart = (frameY * SCREEN_H) / backgroundContext.frameHeight;
-  int destYEnd = ((frameY + 1) * SCREEN_H) / backgroundContext.frameHeight;
+  int destYStart = (frameY * SCREEN_H) / BACKGROUND_TILE_HEIGHT;
+  int destYEnd = ((frameY + 1) * SCREEN_H) / BACKGROUND_TILE_HEIGHT;
   if (destYStart >= SCREEN_H) return 1;
   if (destYEnd > SCREEN_H) destYEnd = SCREEN_H;
   int destLines = destYEnd - destYStart;
@@ -142,20 +146,15 @@ bool drawBackgroundFrame(int frameIndex) {
     return false;
   }
 
-  int imageHeight = png.getHeight();
-  backgroundContext.frameHeight = imageHeight / BACKGROUND_FRAME_COUNT;
   backgroundContext.frameCount = BACKGROUND_FRAME_COUNT;
-  if (backgroundContext.frameHeight <= 0) {
-    png.close();
-    return false;
-  }
+  backgroundContext.frameHeight = BACKGROUND_TILE_HEIGHT;
   if (frameIndex < 0) frameIndex = 0;
   if (frameIndex >= backgroundContext.frameCount) frameIndex = backgroundContext.frameCount - 1;
   backgroundContext.frameIndex = frameIndex;
 
 #if DEBUG_BACKGROUND
-  Serial.printf("[Background] Decoding frame %d from %s (imageH=%d, frameH=%d)\n", frameIndex, BACKGROUND_IMAGE_PATH,
-                imageHeight, backgroundContext.frameHeight);
+  Serial.printf("[Background] Decoding frame %d from %s (frameH=%d)\n", frameIndex, BACKGROUND_IMAGE_PATH,
+                backgroundContext.frameHeight);
 #endif
 
   tft.setSwapBytes(true);
@@ -174,7 +173,8 @@ bool drawBackgroundForCurrentTime(bool forceRedraw, bool &redrawn) {
   }
 
   redrawn = true;
-  int targetFrame = frameForSlot(slot, backgroundContext.frameCount > 0 ? backgroundContext.frameCount : BACKGROUND_FRAME_COUNT);
+  constexpr int DEFAULT_FRAME_INDEX = BACKGROUND_SELECTED_FRAME;
+  int targetFrame = DEFAULT_FRAME_INDEX;
   bool ok = drawBackgroundFrame(targetFrame);
   if (!ok) {
     // Fallback to a solid background so the content area is always cleaned.
